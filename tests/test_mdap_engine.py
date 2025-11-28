@@ -68,10 +68,30 @@ class TestMDAPEngineInitialization:
         """Test successful loading of default configurations."""
         # Setup mocks
         mock_load_ensemble.return_value = EnsembleConfig(
-            models=[LLMConfig(provider="openai", model="gpt-4o")]
+            models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]
         )
         mock_create_ensemble.return_value = EnsembleConfig(
-            models=[LLMConfig(provider="openai", model="gpt-4o")]
+            models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]
         )
         mock_create_red_flag.return_value = RedFlagConfig(rules=[], enabled=True)
         
@@ -91,7 +111,17 @@ class TestMDAPEngineInitialization:
         # Setup mocks to raise exception
         mock_load_ensemble.side_effect = Exception("Config file not found")
         mock_create_ensemble.return_value = EnsembleConfig(
-            models=[LLMConfig(provider="openai", model="gpt-4o")]
+            models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]
         )
         mock_create_red_flag.return_value = RedFlagConfig(rules=[], enabled=True)
         
@@ -110,13 +140,29 @@ class TestConfigurationPreparation:
         engine = MDAPEngine()
         
         provided_config = EnsembleConfig(
-            models=[LLMConfig(provider="openai", model="gpt-4o")]
+            models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]
         )
         
         mdap_input = MDAPInput(
             prompt="Test prompt",
             role_name="test",
-            ensemble_config=provided_config
+            ensemble_config=provided_config,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result = engine._prepare_ensemble_config(mdap_input)
@@ -127,13 +173,30 @@ class TestConfigurationPreparation:
         engine = MDAPEngine()
         
         default_config = EnsembleConfig(
-            models=[LLMConfig(provider="openai", model="gpt-4o")]
+            models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]
         )
         engine.default_ensemble_config = default_config
         
         mdap_input = MDAPInput(
             prompt="Test prompt",
-            role_name="test"
+            role_name="test",
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result = engine._prepare_ensemble_config(mdap_input)
@@ -151,7 +214,13 @@ class TestConfigurationPreparation:
         mdap_input = MDAPInput(
             prompt="Test prompt",
             role_name="test",
-            red_flag_config=provided_config
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=provided_config,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result = engine._prepare_red_flag_config(mdap_input)
@@ -169,7 +238,14 @@ class TestConfigurationPreparation:
         
         mdap_input = MDAPInput(
             prompt="Test prompt",
-            role_name="test"
+            role_name="test",
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result = engine._prepare_red_flag_config(mdap_input)
@@ -223,9 +299,25 @@ class TestConfidenceCalculation:
         """Test confidence calculation with zero rounds."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test",
             red_flags_hit=[],
             is_valid=True,
@@ -249,9 +341,25 @@ class TestConfidenceCalculation:
         """Test confidence calculation with zero valid responses."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test",
             red_flags_hit=[],
             is_valid=True,
@@ -275,9 +383,25 @@ class TestConfidenceCalculation:
         """Test confidence calculation with high vote share."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test",
             red_flags_hit=[],
             is_valid=True,
@@ -303,9 +427,25 @@ class TestConfidenceCalculation:
         """Test confidence calculation with fast path bonus (capped at 1.0)."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test",
             red_flags_hit=[],
             is_valid=True,
@@ -331,9 +471,25 @@ class TestConfidenceCalculation:
         """Test that confidence score is capped at 1.0."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test",
             red_flags_hit=[],
             is_valid=True,
@@ -364,12 +520,28 @@ class TestFastPathExecution:
         engine = MDAPEngine()
         
         # Mock ensemble manager to return empty responses
-        mock_model = LLMConfig(provider="openai", model="gpt-4o")
+        mock_model = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         
         with patch.object(engine.ensemble_manager, 'select_models_for_round', return_value=[]), \
              patch.object(engine.voting_mechanism, 'run_voting', return_value=(
                  ParsedResponse(
-                     raw_response=LLMResponse(response="fallback response", llm_config=mock_model, cost_estimate=0.01, tokens_used=None),
+                     raw_response=LLMResponse(
+                         response="fallback response",
+                         llm_config=mock_model,
+                         cost_estimate=0.01,
+                         latency_ms=0,
+                         tokens_used=None
+                     ),
                      parsed_content="fallback response",
                      red_flags_hit=[],
                      is_valid=True,
@@ -389,7 +561,17 @@ class TestFastPathExecution:
             result_response, metrics = await engine._execute_with_fast_path(
                 "test prompt",
                 EnsembleConfig(models=[mock_model]),  # Non-empty config
-                MDAPInput(prompt="test", role_name="test")
+                MDAPInput(
+                    prompt="test",
+                    role_name="test",
+                    ensemble_config=None,
+                    voting_k=3,
+                    red_flag_config=None,
+                    output_parser_schema=None,
+                    fast_path_enabled=False,
+                    client_request_id=None,
+                    client_sub_step_id=None
+                )
             )
             
             # Should fallback to normal voting
@@ -403,11 +585,27 @@ class TestFastPathExecution:
         engine = MDAPEngine()
         
         # Mock ensemble manager and components
-        mock_model = LLMConfig(provider="openai", model="gpt-4o")
+        mock_model = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         
         with patch.object(engine.ensemble_manager, 'select_models_for_round', return_value=[mock_model]), \
              patch.object(engine.ensemble_manager, 'dispatch_ensemble_calls', return_value=[
-                 LLMResponse(response="fast response", llm_config=mock_model, cost_estimate=0.05, tokens_used=None)
+                 LLMResponse(
+                     response="fast response",
+                     llm_config=mock_model,
+                     cost_estimate=0.05,
+                     latency_ms=0,
+                     tokens_used=None
+                 )
              ]), \
              patch.object(engine.red_flag_engine, 'apply_rules', return_value=[]), \
              patch.object(engine.output_parser, 'parse_output', return_value=("fast response", None)), \
@@ -415,7 +613,13 @@ class TestFastPathExecution:
             
             # Mock fast path to return a winner
             mock_winner = ParsedResponse(
-                raw_response=LLMResponse(response="fast response", llm_config=mock_model, cost_estimate=0.05, tokens_used=None),
+                raw_response=LLMResponse(
+                    response="fast response",
+                    llm_config=mock_model,
+                    cost_estimate=0.05,
+                    latency_ms=0,
+                    tokens_used=None
+                ),
                 parsed_content="fast response",
                 red_flags_hit=[],
                 is_valid=True,
@@ -426,7 +630,17 @@ class TestFastPathExecution:
             result_response, metrics = await engine._execute_with_fast_path(
                 "test prompt",
                 EnsembleConfig(models=[mock_model]),
-                MDAPInput(prompt="test", role_name="test", fast_path_enabled=True)
+                MDAPInput(
+                    prompt="test",
+                    role_name="test",
+                    ensemble_config=None,
+                    voting_k=3,
+                    red_flag_config=None,
+                    output_parser_schema=None,
+                    fast_path_enabled=True,
+                    client_request_id=None,
+                    client_sub_step_id=None
+                )
             )
             
             assert result_response == mock_winner
@@ -439,9 +653,25 @@ class TestFastPathExecution:
         """Test fast-path when it's not triggered and falls back to normal voting."""
         engine = MDAPEngine()
         
-        mock_model = LLMConfig(provider="openai", model="gpt-4o")
+        mock_model = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         mock_winner = ParsedResponse(
-            raw_response=LLMResponse(response="normal response", llm_config=mock_model, cost_estimate=0.05, tokens_used=None),
+            raw_response=LLMResponse(
+                response="normal response",
+                llm_config=mock_model,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="normal response",
             red_flags_hit=[],
             is_valid=True,
@@ -450,7 +680,13 @@ class TestFastPathExecution:
         
         with patch.object(engine.ensemble_manager, 'select_models_for_round', return_value=[mock_model]), \
              patch.object(engine.ensemble_manager, 'dispatch_ensemble_calls', return_value=[
-                 LLMResponse(response="test response", llm_config=mock_model, cost_estimate=0.05, tokens_used=None)
+                 LLMResponse(
+                     response="test response",
+                     llm_config=mock_model,
+                     cost_estimate=0.05,
+                     latency_ms=0,
+                     tokens_used=None
+                 )
              ]), \
              patch.object(engine.red_flag_engine, 'apply_rules', return_value=[]), \
              patch.object(engine.output_parser, 'parse_output', return_value=("test response", None)), \
@@ -468,7 +704,17 @@ class TestFastPathExecution:
             result_response, metrics = await engine._execute_with_fast_path(
                 "test prompt",
                 EnsembleConfig(models=[mock_model]),
-                MDAPInput(prompt="test", role_name="test", fast_path_enabled=True)
+                MDAPInput(
+                    prompt="test",
+                    role_name="test",
+                    ensemble_config=None,
+                    voting_k=3,
+                    red_flag_config=None,
+                    output_parser_schema=None,
+                    fast_path_enabled=True,
+                    client_request_id=None,
+                    client_sub_step_id=None
+                )
             )
             
             assert result_response == mock_winner
@@ -483,9 +729,25 @@ class TestMainExecution:
         """Test successful execution of LLM role."""
         engine = MDAPEngine()
         
-        mock_model = LLMConfig(provider="openai", model="gpt-4o")
+        mock_model = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         mock_winner = ParsedResponse(
-            raw_response=LLMResponse(response="success response", llm_config=mock_model, cost_estimate=0.05, tokens_used=None),
+            raw_response=LLMResponse(
+                response="success response",
+                llm_config=mock_model,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="success response",
             red_flags_hit=[],
             is_valid=True,
@@ -505,8 +767,13 @@ class TestMainExecution:
             mdap_input = MDAPInput(
                 prompt="test prompt",
                 role_name="test_role",
+                ensemble_config=None,
                 voting_k=2,
-                fast_path_enabled=False
+                red_flag_config=None,
+                output_parser_schema=None,
+                fast_path_enabled=False,
+                client_request_id=None,
+                client_sub_step_id=None
             )
             
             result = await engine.execute_llm_role(mdap_input)
@@ -522,9 +789,25 @@ class TestMainExecution:
         """Test execution with fast-path enabled."""
         engine = MDAPEngine()
         
-        mock_model = LLMConfig(provider="openai", model="gpt-4o")
+        mock_model = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         mock_winner = ParsedResponse(
-            raw_response=LLMResponse(response="fast response", llm_config=mock_model, cost_estimate=0.02, tokens_used=None),
+            raw_response=LLMResponse(
+                response="fast response",
+                llm_config=mock_model,
+                cost_estimate=0.02,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="fast response",
             red_flags_hit=[],
             is_valid=True,
@@ -544,7 +827,13 @@ class TestMainExecution:
             mdap_input = MDAPInput(
                 prompt="test prompt",
                 role_name="test_role",
-                fast_path_enabled=True
+                ensemble_config=None,
+                voting_k=3,
+                red_flag_config=None,
+                output_parser_schema=None,
+                fast_path_enabled=True,
+                client_request_id=None,
+                client_sub_step_id=None
             )
             
             result = await engine.execute_llm_role(mdap_input)
@@ -561,7 +850,14 @@ class TestMainExecution:
             
             mdap_input = MDAPInput(
                 prompt="test prompt",
-                role_name="test_role"
+                role_name="test_role",
+                ensemble_config=None,
+                voting_k=3,
+                red_flag_config=None,
+                output_parser_schema=None,
+                fast_path_enabled=False,
+                client_request_id=None,
+                client_sub_step_id=None
             )
             
             result = await engine.execute_llm_role(mdap_input)
@@ -582,9 +878,25 @@ class TestFinalResponsePreparation:
         """Test preparation of string response."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test response", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test response",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="final response",
             red_flags_hit=[],
             is_valid=True,
@@ -598,9 +910,25 @@ class TestFinalResponsePreparation:
         """Test preparation of dictionary response."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content={"key1": "value1", "key2": "value2"},
             red_flags_hit=[],
             is_valid=True,
@@ -615,9 +943,25 @@ class TestFinalResponsePreparation:
         """Test preparation of other response types."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         parsed_response = ParsedResponse(
-            raw_response=LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.0),
+            raw_response=LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.0,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="42",  # Must be string or dict, not int
             red_flags_hit=[],
             is_valid=True,
@@ -642,9 +986,25 @@ class TestCostEstimation:
         """Test cost estimation with single response."""
         engine = MDAPEngine()
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         responses = [
-            LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.05)
+            LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            )
         ]
         
         result = engine._estimate_cost(responses)
@@ -654,14 +1014,62 @@ class TestCostEstimation:
         """Test cost estimation with multiple responses."""
         engine = MDAPEngine()
         
-        llm_config1 = LLMConfig(provider="openai", model="gpt-4o")
-        llm_config2 = LLMConfig(provider="anthropic", model="claude-3")
-        llm_config3 = LLMConfig(provider="openai", model="gpt-3.5")
+        llm_config1 = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
+        llm_config2 = LLMConfig(
+            provider="anthropic",
+            model="claude-3",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
+        llm_config3 = LLMConfig(
+            provider="openai",
+            model="gpt-3.5",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         
         responses = [
-            LLMResponse(response="test1", llm_config=llm_config1, cost_estimate=0.05),
-            LLMResponse(response="test2", llm_config=llm_config2, cost_estimate=0.08),
-            LLMResponse(response="test3", llm_config=llm_config3, cost_estimate=0.02),
+            LLMResponse(
+                response="test1",
+                llm_config=llm_config1,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
+            LLMResponse(
+                response="test2",
+                llm_config=llm_config2,
+                cost_estimate=0.08,
+                latency_ms=0,
+                tokens_used=None
+            ),
+            LLMResponse(
+                response="test3",
+                llm_config=llm_config3,
+                cost_estimate=0.02,
+                latency_ms=0,
+                tokens_used=None
+            ),
         ]
         
         result = engine._estimate_cost(responses)

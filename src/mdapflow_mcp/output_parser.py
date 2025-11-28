@@ -33,7 +33,7 @@ class OutputParser:
             If successful, parsed_content is the parsed data and error_message is None
             If failed, parsed_content is None and error_message contains the error
         """
-        if not output_parser_schema:
+        if output_parser_schema is None:
             # No schema provided, return text as-is
             return response_text, None
 
@@ -93,14 +93,22 @@ class OutputParser:
 
         self._repair_attempts += 1
 
-        # Common repairs
+        # Common repairs - order matters for complex patterns
         repairs = [
-            # Fix trailing commas
+            # Fix trailing commas in objects and arrays first
             (r',(\s*[}\]])', r'\1'),
-            # Fix single quotes to double quotes (basic case)
+            # Fix unquoted property names (keys)
+            (r'\{([^"\']\w+)\s*:', r'{"\1":'),
+            # Fix single quotes to double quotes for keys
             (r"'([^']*)':", r'"\1":'),
-            # Fix unquoted string values (basic case)
-            (r':\s*([^",{}\[\]\s\d][^",}]*)', r': "\1"'),
+            # Fix single quotes to double quotes for string values (but not already quoted)
+            (r':\s*\'([^\']*)\'', r': "\1"'),
+            # Fix unquoted boolean values (before general identifier repair)
+            (r':\s*\b(true)\b', r': true'),
+            (r':\s*\b(false)\b', r': false'),
+            (r':\s*\b(null)\b', r': null'),
+            # Fix unquoted string values - only for simple identifiers
+            (r':\s*\b([a-zA-Z_][a-zA-Z0-9_]*)\b(?!\s*[}\],])', r': "\1"'),
         ]
 
         repaired = json_text

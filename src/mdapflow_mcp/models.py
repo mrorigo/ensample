@@ -29,14 +29,22 @@ class EnsembleConfig(BaseModel):
 
 # --- Red-Flagging Models ---
 class RedFlagRule(BaseModel):
-    """A single rule for identifying problematic LLM outputs."""
+    """A single rule for identifying problematic LLM outputs.
+    
+    Note: This class does not reference RedFlagConfig, avoiding any potential circular dependencies.
+    The relationship is one-way: RedFlagConfig contains a list of RedFlagRule objects.
+    """
     type: Literal["regex", "keyword", "json_parse_error", "length_exceeds"] = Field(..., description="Type of red-flag rule.")
     value: str | None = Field(None, description="Regex pattern, keyword, or length threshold (as string 'N_TOKENS').")
     message: str = Field(..., description="Message to log when this red flag is hit.")
 
 
 class RedFlagConfig(BaseModel):
-    """Configuration for applying red-flag rules."""
+    """Configuration for applying red-flag rules.
+    
+    Contains a list of RedFlagRule objects. The relationship is one-way:
+    RedFlagConfig -> RedFlagRule (no reverse reference).
+    """
     rules: list[RedFlagRule] = Field(default_factory=list, description="List of red-flag rules to apply to LLM outputs.")
     enabled: bool = Field(True, description="Whether red-flagging is enabled.")
 

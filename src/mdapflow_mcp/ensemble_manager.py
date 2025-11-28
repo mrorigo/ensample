@@ -88,18 +88,31 @@ class EnsembleManager:
         Returns:
             List of model configurations to use in this round
         """
+        # Handle edge cases
+        if max_calls <= 0:
+            return []
         if len(ensemble_config.models) <= max_calls:
             return ensemble_config.models
 
-        # Prioritize models that haven't been called recently
-        recent_models = set(self._call_history[-max_calls:])
+        # Create a mapping from model identifiers to model configs for efficient lookup
+        model_id_to_config = {
+            f"{config.provider}/{config.model}": config
+            for config in ensemble_config.models
+        }
+
+        # Get recent model identifiers (string format for hashing)
+        recent_model_ids = set(
+            f"{config.provider}/{config.model}" for config in self._call_history[-max_calls:]
+        )
+
+        # Find available models (those not recently used)
         available_models = [
             config for config in ensemble_config.models
-            if config not in recent_models
+            if f"{config.provider}/{config.model}" not in recent_model_ids
         ]
 
         if len(available_models) >= max_calls:
-            # We have enough unused models
+            # We have enough unused models - select randomly
             selected = random.sample(available_models, max_calls)
         else:
             # Use all available unused models and fill rest with random selection
@@ -107,9 +120,12 @@ class EnsembleManager:
             remaining_needed = max_calls - len(selected)
             remaining_models = [
                 config for config in ensemble_config.models
-                if config not in selected
+                if f"{config.provider}/{config.model}" not in {
+                    f"{c.provider}/{c.model}" for c in selected
+                }
             ]
-            selected.extend(random.sample(remaining_models, remaining_needed))
+            if remaining_models:  # Only sample if we have remaining models
+                selected.extend(random.sample(remaining_models, min(remaining_needed, len(remaining_models))))
 
         return selected
 

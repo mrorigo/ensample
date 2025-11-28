@@ -1,17 +1,12 @@
 """Comprehensive tests for FastPathController - performance optimization component."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-
 from src.mdapflow_mcp.fast_path_controller import FastPathController
 from src.mdapflow_mcp.models import (
     MDAPInput,
     LLMConfig,
     ParsedResponse,
-    LLMResponse,
-    RedFlagConfig,
+    LLMResponse
 )
-
 
 class TestFastPathControllerInitialization:
     """Test FastPathController initialization and configuration."""
@@ -41,13 +36,35 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
-            fast_path_enabled=False
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         current_responses = {
             "response1": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="test1",
                     red_flags_hit=[],
                     is_valid=True,
@@ -67,7 +84,13 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
-            fast_path_enabled=True
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=True,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result = controller.check_fast_path(mdap_input, {}, 1)
@@ -81,12 +104,33 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
+            ensemble_config=None,
+            voting_k=0,
+            red_flag_config=None,
+            output_parser_schema=None,
             fast_path_enabled=True,
-            voting_k=0
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="response1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="response1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response1",
             red_flags_hit=[],
             is_valid=True,
@@ -108,26 +152,79 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
+            ensemble_config=None,
+            voting_k=1,
+            red_flag_config=None,
+            output_parser_schema=None,
             fast_path_enabled=True,
-            voting_k=1
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="response1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="response1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response1",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response2 = ParsedResponse(
-            raw_response=LLMResponse(response="response2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+            raw_response=LLMResponse(
+                response="response2",
+                llm_config=LLMConfig(
+                    provider="anthropic",
+                    model="claude-3",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.06,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response2",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response1_dup = ParsedResponse(
-            raw_response=LLMResponse(response="response1_dup", llm_config=LLMConfig(provider="openai", model="gpt-3.5"), cost_estimate=0.03),
+            raw_response=LLMResponse(
+                response="response1_dup",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-3.5",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.03,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response1",
             red_flags_hit=[],
             is_valid=True,
@@ -150,19 +247,56 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
+            ensemble_config=None,
+            voting_k=2,
+            red_flag_config=None,
+            output_parser_schema=None,
             fast_path_enabled=True,
-            voting_k=2
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="response1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="response1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response1",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response2 = ParsedResponse(
-            raw_response=LLMResponse(response="response2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+            raw_response=LLMResponse(
+                response="response2",
+                llm_config=LLMConfig(
+                    provider="anthropic",
+                    model="claude-3",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.06,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response2",
             red_flags_hit=[],
             is_valid=True,
@@ -186,14 +320,35 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
+            ensemble_config=None,
+            voting_k=3,
+            red_flag_config=None,
+            output_parser_schema=None,
             fast_path_enabled=True,
-            voting_k=3  # High k requiring strong advantage
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         responses = []
         for i in range(5):  # 5 identical responses
             responses.append(ParsedResponse(
-                raw_response=LLMResponse(response=f"response{i}", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                raw_response=LLMResponse(
+                    response=f"response{i}",
+                    llm_config=LLMConfig(
+                        provider="openai",
+                        model="gpt-4o",
+                        api_key_env_var=None,
+                        base_url=None,
+                        temperature=0.1,
+                        top_p=1.0,
+                        max_tokens=None,
+                        stop_sequences=None,
+                        extra_params=None
+                    ),
+                    cost_estimate=0.05,
+                    latency_ms=0,
+                    tokens_used=None
+                ),
                 parsed_content="dominant_response",
                 red_flags_hit=[],
                 is_valid=True,
@@ -215,19 +370,56 @@ class TestFastPathCheck:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
+            ensemble_config=None,
+            voting_k=1,
+            red_flag_config=None,
+            output_parser_schema=None,
             fast_path_enabled=True,
-            voting_k=1
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="response1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="response1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response1",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response2 = ParsedResponse(
-            raw_response=LLMResponse(response="response2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+            raw_response=LLMResponse(
+                response="response2",
+                llm_config=LLMConfig(
+                    provider="anthropic",
+                    model="claude-3",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.06,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="response2",
             red_flags_hit=[],
             is_valid=True,

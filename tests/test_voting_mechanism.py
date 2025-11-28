@@ -1,10 +1,7 @@
 """Comprehensive tests for VotingMechanism - core MDAP voting algorithm."""
 
-import asyncio
 import pytest
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, List
+from unittest.mock import AsyncMock, MagicMock
 
 from src.mdapflow_mcp.voting_mechanism import VotingMechanism
 from src.mdapflow_mcp.models import (
@@ -12,13 +9,11 @@ from src.mdapflow_mcp.models import (
     LLMConfig,
     LLMResponse,
     MDAPInput,
-    MDAPMetrics,
     ParsedResponse,
 )
 from src.mdapflow_mcp.ensemble_manager import EnsembleManager
 from src.mdapflow_mcp.red_flagging_engine import RedFlaggingEngine
 from src.mdapflow_mcp.output_parser import OutputParser
-from src.mdapflow_mcp.exceptions import VotingConvergenceError
 
 
 class TestVotingMechanismInitialization:
@@ -126,7 +121,23 @@ class TestWinnerFinding:
         voting_mechanism = VotingMechanism(ensemble_manager, red_flag_engine, output_parser)
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="test1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="test1",
             red_flags_hit=[],
             is_valid=True,
@@ -151,21 +162,69 @@ class TestWinnerFinding:
         voting_mechanism = VotingMechanism(ensemble_manager, red_flag_engine, output_parser)
         
         response1 = ParsedResponse(
-            raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+            raw_response=LLMResponse(
+                response="test1",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="winner",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response2 = ParsedResponse(
-            raw_response=LLMResponse(response="test2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+            raw_response=LLMResponse(
+                response="test2",
+                llm_config=LLMConfig(
+                    provider="anthropic",
+                    model="claude-3",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.06,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="loser",
             red_flags_hit=[],
             is_valid=True,
             parse_error=None
         )
         response3 = ParsedResponse(
-            raw_response=LLMResponse(response="test3", llm_config=LLMConfig(provider="openai", model="gpt-3.5"), cost_estimate=0.03),
+            raw_response=LLMResponse(
+                response="test3",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-3.5",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.03,
+                latency_ms=0,
+                tokens_used=None
+            ),
             parsed_content="winner",  # Same as response1
             red_flags_hit=[],
             is_valid=True,
@@ -212,7 +271,23 @@ class TestConvergenceChecking:
         response_votes = {
             "response1": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="response1",
                     red_flags_hit=[],
                     is_valid=True,
@@ -236,14 +311,46 @@ class TestConvergenceChecking:
         response_votes = {
             "winner": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
                     parse_error=None
                 ),
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+                    raw_response=LLMResponse(
+                        response="test2",
+                        llm_config=LLMConfig(
+                            provider="anthropic",
+                            model="claude-3",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.06,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
@@ -252,7 +359,23 @@ class TestConvergenceChecking:
             ],
             "loser": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test3", llm_config=LLMConfig(provider="openai", model="gpt-3.5"), cost_estimate=0.03),
+                    raw_response=LLMResponse(
+                        response="test3",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-3.5",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.03,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="loser",
                     red_flags_hit=[],
                     is_valid=True,
@@ -276,7 +399,23 @@ class TestConvergenceChecking:
         response_votes = {
             "response1": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="response1",
                     red_flags_hit=[],
                     is_valid=True,
@@ -285,7 +424,23 @@ class TestConvergenceChecking:
             ],
             "response2": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+                    raw_response=LLMResponse(
+                        response="test2",
+                        llm_config=LLMConfig(
+                            provider="anthropic",
+                            model="claude-3",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.06,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="response2",
                     red_flags_hit=[],
                     is_valid=True,
@@ -309,21 +464,69 @@ class TestConvergenceChecking:
         response_votes = {
             "winner": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
                     parse_error=None
                 ),
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+                    raw_response=LLMResponse(
+                        response="test2",
+                        llm_config=LLMConfig(
+                            provider="anthropic",
+                            model="claude-3",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.06,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
                     parse_error=None
                 ),
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test3", llm_config=LLMConfig(provider="openai", model="gpt-3.5"), cost_estimate=0.03),
+                    raw_response=LLMResponse(
+                        response="test3",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-3.5",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.03,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
@@ -332,7 +535,23 @@ class TestConvergenceChecking:
             ],
             "loser": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test4", llm_config=LLMConfig(provider="openai", model="gpt-4"), cost_estimate=0.04),
+                    raw_response=LLMResponse(
+                        response="test4",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.04,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="loser",
                     red_flags_hit=[],
                     is_valid=True,
@@ -356,14 +575,46 @@ class TestConvergenceChecking:
         response_votes = {
             "winner": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test1", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05),
+                    raw_response=LLMResponse(
+                        response="test1",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-4o",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.05,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
                     parse_error=None
                 ),
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test2", llm_config=LLMConfig(provider="anthropic", model="claude-3"), cost_estimate=0.06),
+                    raw_response=LLMResponse(
+                        response="test2",
+                        llm_config=LLMConfig(
+                            provider="anthropic",
+                            model="claude-3",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.06,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="winner",
                     red_flags_hit=[],
                     is_valid=True,
@@ -372,7 +623,23 @@ class TestConvergenceChecking:
             ],
             "loser": [
                 ParsedResponse(
-                    raw_response=LLMResponse(response="test3", llm_config=LLMConfig(provider="openai", model="gpt-3.5"), cost_estimate=0.03),
+                    raw_response=LLMResponse(
+                        response="test3",
+                        llm_config=LLMConfig(
+                            provider="openai",
+                            model="gpt-3.5",
+                            api_key_env_var=None,
+                            base_url=None,
+                            temperature=0.1,
+                            top_p=1.0,
+                            max_tokens=None,
+                            stop_sequences=None,
+                            extra_params=None
+                        ),
+                        cost_estimate=0.03,
+                        latency_ms=0,
+                        tokens_used=None
+                    ),
                     parsed_content="loser",
                     red_flags_hit=[],
                     is_valid=True,
@@ -408,9 +675,25 @@ class TestCostEstimation:
         
         voting_mechanism = VotingMechanism(ensemble_manager, red_flag_engine, output_parser)
         
-        llm_config = LLMConfig(provider="openai", model="gpt-4o")
+        llm_config = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         responses = [
-            LLMResponse(response="test", llm_config=llm_config, cost_estimate=0.05)
+            LLMResponse(
+                response="test",
+                llm_config=llm_config,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            )
         ]
         
         result = voting_mechanism._estimate_cost(responses)
@@ -424,14 +707,62 @@ class TestCostEstimation:
         
         voting_mechanism = VotingMechanism(ensemble_manager, red_flag_engine, output_parser)
         
-        llm_config1 = LLMConfig(provider="openai", model="gpt-4o")
-        llm_config2 = LLMConfig(provider="anthropic", model="claude-3")
-        llm_config3 = LLMConfig(provider="openai", model="gpt-3.5")
+        llm_config1 = LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
+        llm_config2 = LLMConfig(
+            provider="anthropic",
+            model="claude-3",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
+        llm_config3 = LLMConfig(
+            provider="openai",
+            model="gpt-3.5",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )
         
         responses = [
-            LLMResponse(response="test1", llm_config=llm_config1, cost_estimate=0.05),
-            LLMResponse(response="test2", llm_config=llm_config2, cost_estimate=0.08),
-            LLMResponse(response="test3", llm_config=llm_config3, cost_estimate=0.02),
+            LLMResponse(
+                response="test1",
+                llm_config=llm_config1,
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            ),
+            LLMResponse(
+                response="test2",
+                llm_config=llm_config2,
+                cost_estimate=0.08,
+                latency_ms=0,
+                tokens_used=None
+            ),
+            LLMResponse(
+                response="test3",
+                llm_config=llm_config3,
+                cost_estimate=0.02,
+                latency_ms=0,
+                tokens_used=None
+            ),
         ]
         
         result = voting_mechanism._estimate_cost(responses)
@@ -449,9 +780,35 @@ class TestRunVoting:
         output_parser = MagicMock()
         
         # Mock ensemble manager - make dispatch_ensemble_calls async
-        ensemble_manager.select_models_for_round.return_value = [LLMConfig(provider="openai", model="gpt-4o")]
+        ensemble_manager.select_models_for_round.return_value = [LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key_env_var=None,
+            base_url=None,
+            temperature=0.1,
+            top_p=1.0,
+            max_tokens=None,
+            stop_sequences=None,
+            extra_params=None
+        )]
         ensemble_manager.dispatch_ensemble_calls = AsyncMock(return_value=[
-            LLMResponse(response="winner", llm_config=LLMConfig(provider="openai", model="gpt-4o"), cost_estimate=0.05)
+            LLMResponse(
+                response="winner",
+                llm_config=LLMConfig(
+                    provider="openai",
+                    model="gpt-4o",
+                    api_key_env_var=None,
+                    base_url=None,
+                    temperature=0.1,
+                    top_p=1.0,
+                    max_tokens=None,
+                    stop_sequences=None,
+                    extra_params=None
+                ),
+                cost_estimate=0.05,
+                latency_ms=0,
+                tokens_used=None
+            )
         ])
         
         # Mock red flag engine
@@ -465,12 +822,28 @@ class TestRunVoting:
         mdap_input = MDAPInput(
             prompt="test prompt",
             role_name="test_role",
-            voting_k=0  # Greedy mode
+            ensemble_config=None,
+            voting_k=0,  # Greedy mode
+            red_flag_config=None,
+            output_parser_schema=None,
+            fast_path_enabled=False,
+            client_request_id=None,
+            client_sub_step_id=None
         )
         
         result_response, metrics = await voting_mechanism.run_voting(
             "test prompt",
-            EnsembleConfig(models=[LLMConfig(provider="openai", model="gpt-4o")]),
+            EnsembleConfig(models=[LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                api_key_env_var=None,
+                base_url=None,
+                temperature=0.1,
+                top_p=1.0,
+                max_tokens=None,
+                stop_sequences=None,
+                extra_params=None
+            )]),
             mdap_input
         )
         

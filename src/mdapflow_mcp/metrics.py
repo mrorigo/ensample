@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 from prometheus_client import (
-    CONTENT_TYPE_LATEST,
     Counter,
     Gauge,
     Histogram,
     generate_latest,
+    CONTENT_TYPE_LATEST,
 )
 from prometheus_client.core import CollectorRegistry
 
@@ -75,16 +75,16 @@ mdap_tokens_per_execution_histogram = Histogram(
 mdap_prompt_tokens_histogram = Histogram(
     'mdap_prompt_tokens_histogram',
     'Distribution of prompt tokens per LLM call',
-    buckets=[10, 50, 100, 500, 1000, 2000, 5000, 10000],
     ['provider', 'model'],
+    buckets=[10, 50, 100, 500, 1000, 2000, 5000, 10000],
     registry=REGISTRY
 )
 
 mdap_completion_tokens_histogram = Histogram(
     'mdap_completion_tokens_histogram',
     'Distribution of completion tokens per LLM call',
-    buckets=[10, 50, 100, 500, 1000, 2000, 5000, 10000, 25000],
     ['provider', 'model'],
+    buckets=[10, 50, 100, 500, 1000, 2000, 5000, 10000, 25000],
     registry=REGISTRY
 )
 
@@ -98,8 +98,8 @@ mdap_estimated_cost_usd_total = Counter(
 mdap_cost_per_execution_histogram = Histogram(
     'mdap_cost_per_execution_histogram',
     'Distribution of cost per MDAP execution in USD',
-    buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0],
     ['role_name'],
+    buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0],
     registry=REGISTRY
 )
 
