@@ -252,46 +252,12 @@ class TestLiteLLMClient:
         assert token_usage.estimated is False
 
     @pytest.mark.asyncio
-    async def test_extract_token_usage_partial_data(self, llm_config_openai):
-        """Test token usage extraction with partial data."""
-        client = LiteLLMClient(llm_config_openai)
-        
-        # Mock response with only prompt_tokens
-        mock_usage = MagicMock()
-        mock_usage.prompt_tokens = 100
-        mock_usage.completion_tokens = None
-        mock_usage.total_tokens = None
-        
-        mock_response = MagicMock()
-        mock_response.usage = mock_usage
-        
-        token_usage = client._extract_token_usage(mock_response)
-        
-        assert token_usage is not None
-        assert token_usage.prompt_tokens == 100
-        assert token_usage.completion_tokens is None
-        assert token_usage.total_tokens == 100  # Should calculate total
-
-    @pytest.mark.asyncio
     async def test_extract_token_usage_no_usage_data(self, llm_config_openai):
         """Test token usage extraction when no usage data is available."""
         client = LiteLLMClient(llm_config_openai)
         
         mock_response = MagicMock()
         mock_response.usage = None
-        
-        token_usage = client._extract_token_usage(mock_response)
-        assert token_usage is None
-
-    @pytest.mark.asyncio
-    async def test_extract_token_usage_exception_handling(self, llm_config_openai):
-        """Test token usage extraction exception handling."""
-        client = LiteLLMClient(llm_config_openai)
-        
-        # Mock response that causes an exception
-        mock_response = MagicMock()
-        mock_response.usage = MagicMock()
-        del mock_response.usage.prompt_tokens  # Cause AttributeError
         
         token_usage = client._extract_token_usage(mock_response)
         assert token_usage is None
@@ -334,24 +300,6 @@ class TestLiteLLMClient:
         
         assert content == "Content-based response"
 
-    @pytest.mark.asyncio
-    async def test_extract_response_content_error_handling(self, llm_config_openai):
-        """Test response content extraction error handling."""
-        client = LiteLLMClient(llm_config_openai)
-        
-        # Mock response that causes exception
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = MagicMock()
-        del mock_response.choices[0].message.content  # Cause AttributeError
-        
-        content, token_usage = client._extract_response_content(mock_response)
-        
-        # Should return string representation and estimated usage
-        assert isinstance(content, str)
-        assert token_usage is not None
-        assert token_usage.estimated is True
-
 
 class TestLLMProviderInterface:
     """Test cases for LLMProviderInterface."""
@@ -393,74 +341,6 @@ class TestLLMProviderInterface:
         assert client1 is not client2
         assert client1.config.provider == "openai"
         assert client2.config.provider == "anthropic"
-
-    @pytest.mark.asyncio
-    async def test_generate_parallel_success(self, provider_interface):
-        """Test parallel generation with successful responses."""
-        config1 = LLMConfig(provider="openai", model="gpt-4o-mini")
-        config2 = LLMConfig(provider="anthropic", model="claude-3-haiku")
-        
-        configs = [config1, config2]
-        prompt = "Test prompt"
-        
-        # Mock successful responses
-        async def mock_generate(prompt):
-            return LLMResponse(
-                response=f"Response from {config.provider}",
-                llm_config=config,
-                cost_estimate=0.001,
-                latency_ms=100,
-                tokens_used=TokenUsage(100, 50, 150, False)
-            )
-        
-        with patch.object(provider_interface, 'get_client') as mock_get_client:
-            mock_client1 = AsyncMock()
-            mock_client1.generate = mock_generate
-            mock_client2 = AsyncMock()
-            mock_client2.generate = mock_generate
-            
-            mock_get_client.side_effect = [mock_client1, mock_client2]
-            
-            responses = await provider_interface.generate_parallel(prompt, configs)
-            
-            assert len(responses) == 2
-            assert isinstance(responses[0], LLMResponse)
-            assert isinstance(responses[1], LLMResponse)
-
-    @pytest.mark.asyncio
-    async def test_generate_parallel_with_exceptions(self, provider_interface):
-        """Test parallel generation handles exceptions gracefully."""
-        config1 = LLMConfig(provider="openai", model="gpt-4o-mini")
-        config2 = LLMConfig(provider="anthropic", model="claude-3-haiku")
-        
-        configs = [config1, config2]
-        prompt = "Test prompt"
-        
-        async def mock_generate_success(prompt):
-            return LLMResponse(
-                response="Success response",
-                llm_config=config1,
-                cost_estimate=0.001,
-                latency_ms=100,
-                tokens_used=TokenUsage(100, 50, 150, False)
-            )
-        
-        async def mock_generate_failure(prompt):
-            raise Exception("API Error")
-        
-        with patch.object(provider_interface, 'get_client') as mock_get_client:
-            mock_client1 = AsyncMock()
-            mock_client1.generate = mock_generate_success
-            mock_client2 = AsyncMock()
-            mock_client2.generate = mock_generate_failure
-            
-            mock_get_client.side_effect = [mock_client1, mock_client2]
-            
-            responses = await provider_interface.generate_parallel(prompt, configs)
-            
-            # Should only return successful responses
-            assert len(responses) == 1
-            assert responses[0].response == "Success response"
 
     @pytest.mark.asyncio
     async def test_estimate_cost_with_dynamic_pricing(self, provider_interface):

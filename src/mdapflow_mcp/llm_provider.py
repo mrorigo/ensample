@@ -98,55 +98,29 @@ class LiteLLMClient(BaseLLMClient):
             completion_tokens = None
             total_tokens = None
 
-            # Common patterns across providers - handle MagicMock edge cases
-            try:
-                # Check if prompt_tokens exists and is not None (to handle MagicMock)
-                if hasattr(usage, 'prompt_tokens'):
-                    attr_value = getattr(usage, 'prompt_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        prompt_tokens = attr_value
-                elif hasattr(usage, 'input_tokens'):
-                    attr_value = getattr(usage, 'input_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        prompt_tokens = attr_value
-                elif hasattr(usage, 'context_tokens'):
-                    attr_value = getattr(usage, 'context_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        prompt_tokens = attr_value
-            except AttributeError:
-                pass  # Attribute doesn't exist, continue
+            # Common patterns across providers
+            if hasattr(usage, 'prompt_tokens'):
+                prompt_tokens = usage.prompt_tokens
+            elif hasattr(usage, 'input_tokens'):
+                prompt_tokens = usage.input_tokens
+            elif hasattr(usage, 'context_tokens'):
+                prompt_tokens = usage.context_tokens
 
-            try:
-                # Check if completion_tokens exists and is not None (to handle MagicMock)
-                if hasattr(usage, 'completion_tokens'):
-                    attr_value = getattr(usage, 'completion_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        completion_tokens = attr_value
-                elif hasattr(usage, 'output_tokens'):
-                    attr_value = getattr(usage, 'output_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        completion_tokens = attr_value
-                elif hasattr(usage, 'generated_tokens'):
-                    attr_value = getattr(usage, 'generated_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        completion_tokens = attr_value
-            except AttributeError:
-                pass  # Attribute doesn't exist, continue
+            if hasattr(usage, 'completion_tokens'):
+                completion_tokens = usage.completion_tokens
+            elif hasattr(usage, 'output_tokens'):
+                completion_tokens = usage.output_tokens
+            elif hasattr(usage, 'generated_tokens'):
+                completion_tokens = usage.generated_tokens
 
-            try:
-                # Check if total_tokens exists and is not None (to handle MagicMock)
-                if hasattr(usage, 'total_tokens'):
-                    attr_value = getattr(usage, 'total_tokens')
-                    if attr_value is not None and not str(attr_value).startswith('<MagicMock'):
-                        total_tokens = attr_value
-                elif prompt_tokens is not None and completion_tokens is not None:
-                    total_tokens = prompt_tokens + completion_tokens
-                elif prompt_tokens is not None:
-                    total_tokens = prompt_tokens
-                elif completion_tokens is not None:
-                    total_tokens = completion_tokens
-            except AttributeError:
-                pass  # Attribute doesn't exist, continue
+            if hasattr(usage, 'total_tokens'):
+                total_tokens = usage.total_tokens
+            elif prompt_tokens is not None and completion_tokens is not None:
+                total_tokens = prompt_tokens + completion_tokens
+            elif prompt_tokens is not None:
+                total_tokens = prompt_tokens
+            elif completion_tokens is not None:
+                total_tokens = completion_tokens
 
             # Only return if we found at least some token information
             if prompt_tokens is not None or completion_tokens is not None or total_tokens is not None:

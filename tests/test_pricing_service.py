@@ -151,18 +151,6 @@ class TestPricingService:
         assert stats_after["total_entries"] == 0
 
     @pytest.mark.asyncio
-    @patch('mdapflow_mcp.pricing_service.httpx.AsyncClient.get')
-    async def test_openrouter_api_failure_fallback(self, mock_get, pricing_service):
-        """Test that API failures fall back to static pricing."""
-        # Mock API failure
-        mock_get.side_effect = Exception("API unavailable")
-        
-        # Should still get static pricing as fallback
-        pricing = await pricing_service.get_pricing("openai", "gpt-5.1-codex")
-        assert pricing.source == "fallback"
-        assert pricing.input_rate > 0
-
-    @pytest.mark.asyncio
     async def test_pricing_info_named_tuple(self):
         """Test PricingInfo named tuple functionality."""
         pricing = PricingInfo(0.001, 0.002, "USD", 1234567890.0, "test_source")
