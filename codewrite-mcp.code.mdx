@@ -1,0 +1,1999 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  codewrite_mcp/
+    language_handlers/
+      __init__.py
+      python_handler.py
+      typescript_handler.py
+    tools/
+      __init__.py
+      code_modification.py
+      dependencies.py
+      filesystem.py
+      structured_data.py
+      verification.py
+    __init__.py
+    dependency_manager.py
+    exceptions.py
+    models.py
+    observability.py
+    server.py
+    structured_data_handler.py
+    verification_engine.py
+    workspace_manager.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/codewrite_mcp/language_handlers/python_handler.py">
+"""Python-specific AST utilities powered by libcst."""
+
+from __future__ import annotations
+
+from typing import List, Mapping, Sequence, Tuple, cast
+
+import libcst as cst
+from libcst.metadata import CodeRange, MetadataWrapper, PositionProvider
+
+from ..exceptions import ToolInternalError, ToolValidationError
+from ..models import InsertionPoint, InsertionPosition, LineCharRange, SymbolSelector
+from ..workspace_manager import WorkspaceError, WorkspaceManager
+
+
+class PythonHandler:
+    """High-level helper for AST-aware Python modifications."""
+
+    def __init__(self, workspace: WorkspaceManager) -> None:
+        self.workspace = workspace
+
+    def insert_code(
+        self, path: str, code: str, insertion_point: InsertionPoint
+    ) -> None:
+        module = self._parse_module(path)
+        statements = self._parse_statements(code)
+        module = self._insert_statements(module, statements, insertion_point)
+        self._write_module(path, module)
+
+    def delete_symbol(self, selector: SymbolSelector) -> None:
+        path = self._selector_path(selector)
+        module = self._parse_module(path)
+        index, _ = self._find_symbol_statement(module, selector)
+        body = list(module.body)
+        body.pop(index)
+        updated = module.with_changes(body=tuple(body))
+        self._write_module(path, updated)
+
+    def rename_symbol(self, selector: SymbolSelector, new_name: str) -> None:
+        if not new_name:
+            raise ToolValidationError("new_name must be provided for rename_symbol")
+        path = self._selector_path(selector)
+        module = self._parse_module(path)
+        _, node = self._find_symbol_statement(module, selector)
+
+        target_name = self._statement_name(node)
+        if not target_name:
+            raise ToolValidationError("Unable to determine symbol name for rename.")
+
+        transformer = _RenameTransformer(target_name, new_name)
+        updated = module.visit(transformer)
+        self._write_module(path, updated)
+
+    def move_symbol(
+        self,
+        selector: SymbolSelector,
+        destination_path: str,
+        insertion_point: InsertionPoint,
+    ) -> Tuple[str, str]:
+        """Move a top-level symbol to a new module. Returns (source_path, destination_path)."""
+
+        source_path = self._selector_path(selector)
+        if destination_path == "":
+            raise ToolValidationError("destination_path is required for move_symbol.")
+        module = self._parse_module(source_path)
+        index, node = self._find_symbol_statement(module, selector)
+
+        source_body = list(module.body)
+        removed_node = source_body.pop(index)
+        updated_source = module.with_changes(body=tuple(source_body))
+
+        destination_module = self._parse_module(destination_path)
+        destination_module = self._insert_statements(
+            destination_module, [removed_node.deep_clone()], insertion_point
+        )
+
+        self._write_module(source_path, updated_source)
+        self._write_module(destination_path, destination_module)
+        return source_path, destination_path
+
+    # Internal helpers -----------------------------------------------------
+
+    def _parse_module(self, path: str) -> cst.Module:
+        source = ""
+        try:
+            if self.workspace.exists(path):
+                source = self.workspace.read_text(path)
+        except WorkspaceError as exc:
+            raise ToolValidationError(str(exc)) from exc
+        try:
+            return cst.parse_module(source)
+        except cst.ParserSyntaxError as exc:
+            raise ToolInternalError(
+                f"Failed to parse Python module {path}: {exc}"
+            ) from exc
+
+    def _write_module(self, path: str, module: cst.Module) -> None:
+        try:
+            self.workspace.write_text(path, module.code, overwrite=True)
+        except WorkspaceError as exc:
+            raise ToolInternalError(str(exc)) from exc
+
+    def _parse_statements(self, code: str) -> List[cst.BaseStatement]:
+        try:
+            snippet = cst.parse_module(code)
+        except cst.ParserSyntaxError as exc:
+            raise ToolValidationError(f"Invalid Python snippet: {exc}") from exc
+        statements = cast(List[cst.BaseStatement], list(snippet.body))
+        if not statements:
+            raise ToolValidationError("Code snippet must include at least one statement.")
+        return statements
+
+    def _insert_statements(
+        self,
+        module: cst.Module,
+        statements: Sequence[cst.BaseStatement],
+        insertion_point: InsertionPoint,
+    ) -> cst.Module:
+        body = list(module.body)
+        index = self._determine_insertion_index(module, insertion_point)
+        typed_statements = [
+            cast(cst.SimpleStatementLine | cst.BaseCompoundStatement, stmt)
+            for stmt in statements
+        ]
+        body[index:index] = typed_statements
+        return module.with_changes(body=tuple(body))
+
+    def _determine_insertion_index(
+        self, module: cst.Module, insertion_point: InsertionPoint
+    ) -> int:
+        body = list(module.body)
+        position = insertion_point.position
+
+        if position == InsertionPosition.START:
+            return 0
+        if position == InsertionPosition.END:
+            return len(body)
+        if position == InsertionPosition.AFTER_IMPORTS:
+            last_import = -1
+            for idx, stmt in enumerate(body):
+                if _is_import_statement(stmt):
+                    last_import = idx
+            return last_import + 1
+        if position in (
+            InsertionPosition.BEFORE_SYMBOL,
+            InsertionPosition.AFTER_SYMBOL,
+        ):
+            if not insertion_point.anchor:
+                raise ToolValidationError(
+                    "InsertionPoint.anchor is required for symbol-relative insertions."
+                )
+            anchor_idx, _ = self._find_symbol_statement(module, insertion_point.anchor)
+            return anchor_idx + (1 if position == InsertionPosition.AFTER_SYMBOL else 0)
+
+        raise ToolValidationError(f"Unsupported insertion position: {position}")
+
+    def _find_symbol_statement(
+        self, module: cst.Module, selector: SymbolSelector
+    ) -> Tuple[int, cst.CSTNode]:
+        body = list(module.body)
+        wrapper = MetadataWrapper(module)
+        positions = wrapper.resolve(PositionProvider)
+
+        for idx, stmt in enumerate(body):
+            if not isinstance(stmt, (cst.FunctionDef, cst.ClassDef)):
+                continue
+            if self._selector_matches_statement(selector, stmt, positions):
+                return idx, stmt
+        raise ToolValidationError("Symbol not found in target module.")
+
+    def _selector_matches_statement(
+        self,
+        selector: SymbolSelector,
+        statement: cst.CSTNode,
+        positions: Mapping[cst.CSTNode, CodeRange],
+    ) -> bool:
+        statement_name = self._statement_name(statement)
+        simple_name = _selector_name(selector)
+        if simple_name and statement_name == simple_name:
+            return True
+
+        if selector.range:
+            pos = positions.get(statement)
+            if pos and _range_matches_position(selector.range, pos):
+                return True
+        return False
+
+    def _selector_path(self, selector: SymbolSelector) -> str:
+        if not selector.file:
+            raise ToolValidationError("Symbol selector must include a file path.")
+        return selector.file.root
+
+    @staticmethod
+    def _statement_name(statement: cst.CSTNode | None) -> str | None:
+        if isinstance(statement, (cst.FunctionDef, cst.ClassDef)):
+            return statement.name.value
+        return None
+
+
+def _selector_name(selector: SymbolSelector) -> str | None:
+    if selector.name:
+        return selector.name
+    if selector.fqn:
+        return selector.fqn.root.split(".")[-1]
+    return None
+
+
+def _is_import_statement(statement: cst.CSTNode) -> bool:
+    if isinstance(statement, cst.SimpleStatementLine):
+        for element in statement.body:
+            if isinstance(element, (cst.Import, cst.ImportFrom)):
+                return True
+    return False
+
+
+def _range_matches_position(line_range: LineCharRange, position) -> bool:
+    return (
+        position.start.line == line_range.start_line
+        and position.start.column == line_range.start_char
+        and position.end.line == line_range.end_line
+        and position.end.column == line_range.end_char
+    )
+
+
+class _RenameTransformer(cst.CSTTransformer):
+    def __init__(self, old: str, new: str) -> None:
+        self.old = old
+        self.new = new
+
+    def leave_Name(self, original_node: cst.Name, updated_node: cst.Name) -> cst.Name:
+        if original_node.value == self.old:
+            return updated_node.with_changes(value=self.new)
+        return updated_node
+</file>
+
+<file path="src/codewrite_mcp/__init__.py">
+"""Public package surface for CodeWrite-MCP."""
+
+from .server import main, server
+
+__all__ = ["main", "server"]
+</file>
+
+<file path="src/codewrite_mcp/models.py">
+"""
+Pydantic models that mirror the CodeWrite-MCP specification.
+
+These models are shared between the FastMCP server and tool implementations so
+that all inputs and outputs use the same structured schema the orchestrator
+expects.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field, RootModel, field_validator, model_validator
+
+
+class URI(RootModel[str]):
+    """Represents a workspace-relative URI or absolute file path."""
+
+    root: str = Field(
+        description="Workspace-relative path or URI indicating a resource location.",
+    )
+
+    @property
+    def path(self) -> Path:
+        return Path(self.root)
+
+
+class FQN(RootModel[str]):
+    """Fully qualified name of a symbol inside the workspace."""
+
+    root: str = Field(
+        description="Fully qualified name including module path (e.g. package.module.Class.method)."
+    )
+
+
+class LineCharRange(BaseModel):
+    """Represents a range in a text document using 1-based line/character offsets."""
+
+    start_line: int = Field(..., ge=1, description="1-based start line for the range.")
+    start_char: int = Field(
+        ..., ge=0, description="0-based character offset within the start line."
+    )
+    end_line: int = Field(..., ge=1, description="1-based end line for the range.")
+    end_char: int = Field(
+        ..., ge=0, description="0-based character offset within the end line."
+    )
+
+    @field_validator("end_line")
+    @classmethod
+    def validate_range(cls, end_line: int, info):
+        start_line = info.data.get("start_line")
+        if start_line and end_line < start_line:
+            raise ValueError("end_line must be >= start_line")
+        return end_line
+
+    @model_validator(mode="after")
+    def validate_characters(self):
+        if self.start_line == self.end_line and self.end_char < self.start_char:
+            raise ValueError("end_char must be >= start_char when lines match")
+        return self
+
+
+class SymbolSelector(BaseModel):
+    """Selection metadata that uniquely identifies a symbol."""
+
+    file: URI = Field(..., description="File containing the symbol.")
+    fqn: Optional[FQN] = Field(
+        default=None, description="Fully qualified symbol name, if known."
+    )
+    range: Optional[LineCharRange] = Field(
+        default=None,
+        description="Specific range that encloses the symbol inside the file.",
+    )
+    name: Optional[str] = Field(
+        default=None,
+        description="Short name of the symbol when the FQN is not available.",
+    )
+
+
+class InsertionPosition(str, Enum):
+    START = "start"
+    END = "end"
+    AFTER_IMPORTS = "after_imports"
+    BEFORE_SYMBOL = "before_symbol"
+    AFTER_SYMBOL = "after_symbol"
+
+
+class InsertionPoint(BaseModel):
+    """Where new code should be inserted within a file."""
+
+    position: InsertionPosition = Field(
+        default=InsertionPosition.END,
+        description="Relative position for the insertion within the target file.",
+    )
+    anchor: Optional[SymbolSelector] = Field(
+        default=None,
+        description="Optional anchor symbol used with before/after symbol insertions.",
+    )
+
+
+class DiagnosticSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class Diagnostic(BaseModel):
+    """Structured diagnostic message produced by tools or verification engines."""
+
+    severity: DiagnosticSeverity = Field(
+        default=DiagnosticSeverity.INFO, description="Severity level for the diagnostic."
+    )
+    message: str = Field(..., description="Human readable description of the issue.")
+    code: Optional[str] = Field(
+        default=None, description="Machine readable diagnostic or rule code."
+    )
+    file: Optional[URI] = Field(
+        default=None, description="File path associated with the diagnostic."
+    )
+    range: Optional[LineCharRange] = Field(
+        default=None, description="Precise location associated with the diagnostic."
+    )
+    metadata: dict = Field(
+        default_factory=dict,
+        description="Arbitrary metadata with tool specific diagnostic context.",
+    )
+
+
+class TestStatus(str, Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+    ERROR = "error"
+    SKIPPED = "skipped"
+
+
+class TestResult(BaseModel):
+    """Summary of an individual verification invocation (tests, lint, etc.)."""
+
+    name: str = Field(..., description="Name for the verification target.")
+    status: TestStatus = Field(..., description="Result status.")
+    duration: float = Field(
+        default=0.0, ge=0.0, description="Execution duration in seconds."
+    )
+    stdout: str = Field(
+        default="", description="Captured stdout for the verification command."
+    )
+    stderr: str = Field(
+        default="", description="Captured stderr for the verification command."
+    )
+    diagnostics: List[Diagnostic] = Field(
+        default_factory=list,
+        description="Diagnostics reported during verification execution.",
+    )
+
+
+class FileMetadata(BaseModel):
+    """Metadata describing a file or directory entry."""
+
+    path: URI = Field(..., description="Workspace relative path for the entry.")
+    type: Literal["file", "directory"] = Field(
+        ..., description="Indicates whether the entry is a file or directory."
+    )
+    size: Optional[int] = Field(
+        default=None, ge=0, description="Size on disk in bytes when applicable."
+    )
+    modified_at: Optional[datetime] = Field(
+        default=None, description="Modification timestamp for the path."
+    )
+
+
+class DirectoryListing(BaseModel):
+    """Represents the results of listing a directory in the workspace."""
+
+    path: URI = Field(..., description="Directory that was listed.")
+    entries: List[FileMetadata] = Field(
+        default_factory=list,
+        description="Child entries that were included after gitignore filtering.",
+    )
+
+
+class FileContentsResponse(BaseModel):
+    """Returned payload for read file operations."""
+
+    path: URI = Field(..., description="Path that was read.")
+    content: str = Field(..., description="Raw textual content of the file.")
+    encoding: str = Field(
+        default="utf-8", description="Encoding used when reading/writing the file."
+    )
+    size: int = Field(..., ge=0, description="Size in bytes for the file.")
+    modified_at: Optional[datetime] = Field(
+        default=None, description="Last modified timestamp for the file."
+    )
+
+
+class MutationStatus(str, Enum):
+    CREATED = "created"
+    UPDATED = "updated"
+    DELETED = "deleted"
+
+
+class FileMutationResult(BaseModel):
+    """Generic response schema for create/edit/delete file tools."""
+
+    path: URI = Field(..., description="Path mutated by the tool.")
+    status: MutationStatus = Field(..., description="Result state after mutation.")
+    message: str = Field(
+        default="", description="Human readable summary of the mutation."
+    )
+
+
+class RawEditOperationType(str, Enum):
+    INSERT = "insert"
+    REPLACE = "replace"
+    DELETE = "delete"
+
+
+class RawEditOperation(BaseModel):
+    """Instruction that drives the edit_raw_file tool."""
+
+    type: RawEditOperationType = Field(
+        ...,
+        description="Type of the edit to perform: insert, replace or delete.",
+    )
+    range: Optional[LineCharRange] = Field(
+        default=None,
+        description="Target range for replace/delete edits or insertion cursor.",
+    )
+    content: str = Field(
+        default="",
+        description="Content to insert or replace. Empty for pure delete operations.",
+    )
+</file>
+
+<file path="src/codewrite_mcp/structured_data_handler.py">
+"""Handlers for structured configuration formats (JSON/YAML)."""
+
+from __future__ import annotations
+
+import io
+import json
+from typing import Any
+
+from jsonpath_ng import parse as jsonpath_parse
+from ruamel.yaml import YAML
+
+from .exceptions import ToolInternalError, ToolValidationError
+from .workspace_manager import WorkspaceError, WorkspaceManager
+
+
+class StructuredDataHandler:
+    """Encapsulates JSON/YAML editing logic."""
+
+    def __init__(self, workspace: WorkspaceManager) -> None:
+        self.workspace = workspace
+        self._yaml = YAML()
+        self._yaml.preserve_quotes = True
+        self._yaml.indent(sequence=2, offset=2)
+
+    def edit_json_value(self, path: str, expression: str, value: Any) -> int:
+        document = self._read_json(path)
+        matches, document = self._apply_jsonpath(document, expression, value)
+        self._write_json(path, document)
+        return matches
+
+    def edit_yaml_value(self, path: str, expression: str, value: Any) -> int:
+        document = self._read_yaml(path)
+        matches, document = self._apply_jsonpath(document, expression, value)
+        self._write_yaml(path, document)
+        return matches
+
+    def _apply_jsonpath(self, document: Any, expression: str, value: Any) -> tuple[int, Any]:
+        try:
+            jsonpath_expr = jsonpath_parse(expression)
+        except Exception as exc:  # pragma: no cover - jsonpath raises custom errors
+            raise ToolValidationError(f"Invalid JSONPath expression: {expression}") from exc
+        matches = list(jsonpath_expr.find(document))
+        if not matches:
+            raise ToolValidationError("JSONPath did not match any nodes.")
+        updated_document = jsonpath_expr.update(document, value)
+        return len(matches), updated_document
+
+    def _read_json(self, path: str) -> Any:
+        try:
+            if not self.workspace.exists(path):
+                raise ToolValidationError(f"JSON file does not exist: {path}")
+            content = self.workspace.read_text(path)
+            return json.loads(content or "{}")
+        except json.JSONDecodeError as exc:
+            raise ToolValidationError(f"Invalid JSON in {path}: {exc}") from exc
+        except WorkspaceError as exc:
+            raise ToolValidationError(str(exc)) from exc
+
+    def _write_json(self, path: str, document: Any) -> None:
+        try:
+            text = json.dumps(document, indent=2, ensure_ascii=False)
+            self.workspace.write_text(path, f"{text}\n", overwrite=True)
+        except TypeError as exc:
+            raise ToolValidationError(f"Value is not JSON serializable: {exc}") from exc
+        except WorkspaceError as exc:
+            raise ToolInternalError(str(exc)) from exc
+
+    def _read_yaml(self, path: str) -> Any:
+        try:
+            if not self.workspace.exists(path):
+                raise ToolValidationError(f"YAML file does not exist: {path}")
+            content = self.workspace.read_text(path)
+            return self._yaml.load(content) or {}
+        except WorkspaceError as exc:
+            raise ToolValidationError(str(exc)) from exc
+        except Exception as exc:  # pragma: no cover - ruamel raises custom exceptions
+            raise ToolValidationError(f"Invalid YAML in {path}: {exc}") from exc
+
+    def _write_yaml(self, path: str, document: Any) -> None:
+        try:
+            stream = io.StringIO()
+            self._yaml.dump(document, stream)
+            text = stream.getvalue()
+            if not text.endswith("\n"):
+                text += "\n"
+            self.workspace.write_text(path, text, overwrite=True)
+        except WorkspaceError as exc:
+            raise ToolInternalError(str(exc)) from exc
+</file>
+
+<file path="src/codewrite_mcp/tools/dependencies.py">
+"""MCP tools for dependency management."""
+
+from __future__ import annotations
+
+import asyncio
+
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from ..dependency_manager import DependencyManager
+from ..models import URI, FileMutationResult, MutationStatus
+from ..observability import instrumented_tool
+
+
+class DependencyTools:
+    def __init__(self, manager: DependencyManager) -> None:
+        self.manager = manager
+
+    def register(self, server: FastMCP) -> None:
+        @instrumented_tool(server, name="codewrite.add_dependency")
+        async def add_dependency(
+            spec: str = Field(description="Dependency spec (e.g., 'requests>=2.0').")
+        ) -> FileMutationResult:
+            package = await asyncio.to_thread(self.manager.add_dependency, spec)
+            return FileMutationResult(
+                path=URI("pyproject.toml"),
+                status=MutationStatus.UPDATED,
+                message=f"Added dependency {package}",
+            )
+
+        @instrumented_tool(server, name="codewrite.remove_dependency")
+        async def remove_dependency(
+            spec: str = Field(description="Exact dependency string to remove.")
+        ) -> FileMutationResult:
+            package = await asyncio.to_thread(self.manager.remove_dependency, spec)
+            return FileMutationResult(
+                path=URI("pyproject.toml"),
+                status=MutationStatus.UPDATED,
+                message=f"Removed dependency {package}",
+            )
+
+        @instrumented_tool(server, name="codewrite.install_dependencies")
+        async def install_dependencies() -> FileMutationResult:
+            await asyncio.to_thread(self.manager.install_dependencies)
+            return FileMutationResult(
+                path=URI("pyproject.toml"),
+                status=MutationStatus.UPDATED,
+                message="Dependencies installed via uv sync",
+            )
+</file>
+
+<file path="src/codewrite_mcp/tools/structured_data.py">
+"""Tools for structured configuration editing."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from ..models import URI, FileMutationResult, MutationStatus
+from ..observability import instrumented_tool
+from ..structured_data_handler import StructuredDataHandler
+
+
+class StructuredDataTools:
+    def __init__(self, handler: StructuredDataHandler) -> None:
+        self.handler = handler
+
+    def register(self, server: FastMCP) -> None:
+        @instrumented_tool(server, name="codewrite.edit_json_value")
+        async def edit_json_value(
+            path: str = Field(description="JSON file to edit."),
+            json_path: str = Field(description="JSONPath expression selecting nodes to edit."),
+            value: Any = Field(description="New value to assign to the selected nodes."),
+        ) -> FileMutationResult:
+            matches = await self._to_thread(self.handler.edit_json_value, path, json_path, value)
+            return FileMutationResult(
+                path=URI(path),
+                status=MutationStatus.UPDATED,
+                message=f"Updated {matches} JSON node(s) in {path}",
+            )
+
+        @instrumented_tool(server, name="codewrite.edit_yaml_value")
+        async def edit_yaml_value(
+            path: str = Field(description="YAML file to edit."),
+            json_path: str = Field(description="JSONPath expression selecting nodes to edit."),
+            value: Any = Field(description="New value to assign to the selected nodes."),
+        ) -> FileMutationResult:
+            matches = await self._to_thread(self.handler.edit_yaml_value, path, json_path, value)
+            return FileMutationResult(
+                path=URI(path),
+                status=MutationStatus.UPDATED,
+                message=f"Updated {matches} YAML node(s) in {path}",
+            )
+
+    async def _to_thread(self, func, *args):
+        return await asyncio.to_thread(func, *args)
+</file>
+
+<file path="src/codewrite_mcp/tools/verification.py">
+"""MCP tools for verification commands."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import List, Sequence
+
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from ..models import TestResult
+from ..observability import instrumented_tool
+from ..verification_engine import VerificationEngine
+
+
+class VerificationTools:
+    def __init__(self, engine: VerificationEngine) -> None:
+        self.engine = engine
+
+    def register(self, server: FastMCP) -> None:
+        @instrumented_tool(server, name="codewrite.run_tests")
+        async def run_tests(
+            args: Sequence[str] | None = Field(
+                default=None, description="Additional arguments passed to pytest."
+            ),
+        ) -> TestResult:
+            return await asyncio.to_thread(self.engine.run_pytest, args)
+
+        @instrumented_tool(server, name="codewrite.lint_and_typecheck")
+        async def lint_and_typecheck(
+            paths: Sequence[str] | None = Field(
+                default=None, description="Optional list of paths to pass to ruff/mypy."
+            )
+        ) -> List[TestResult]:
+            results = await asyncio.to_thread(self._run_lint_typecheck, paths or ["."])
+            return results
+
+    def _run_lint_typecheck(self, paths: Sequence[str]) -> List[TestResult]:
+        ruff_result = self.engine.run_ruff(paths)
+        mypy_result = self.engine.run_mypy(paths)
+        return [ruff_result, mypy_result]
+</file>
+
+<file path="src/codewrite_mcp/dependency_manager.py">
+"""Dependency management helpers for CodeWrite-MCP."""
+
+from __future__ import annotations
+
+from typing import List
+
+import tomlkit
+
+from .exceptions import ToolInternalError, ToolValidationError
+from .observability import LOGGER, run_subprocess
+from .workspace_manager import WorkspaceManager
+
+
+class DependencyManager:
+    def __init__(self, workspace: WorkspaceManager) -> None:
+        self.workspace = workspace
+        self.pyproject_path = self.workspace.root / "pyproject.toml"
+
+    def add_dependency(self, spec: str) -> str:
+        LOGGER.info("dependency.add", extra={"spec": spec})
+        doc = self._load_pyproject()
+        project = doc.setdefault("project", {})
+        dependencies = project.setdefault("dependencies", tomlkit.array())  # type: ignore[assignment]
+        if spec in dependencies:
+            raise ToolValidationError(f"Dependency '{spec}' already present in pyproject.toml")
+        dependencies.append(spec)
+        self._write_pyproject(doc)
+        self._run_uv(["uv", "pip", "install", spec])
+        return spec
+
+    def remove_dependency(self, package: str) -> str:
+        LOGGER.info("dependency.remove", extra={"spec": package})
+        doc = self._load_pyproject()
+        project = doc.get("project")
+        if not project or "dependencies" not in project:
+            raise ToolValidationError("No dependencies section found in pyproject.toml")
+        dependencies = project["dependencies"]
+        if package not in dependencies:
+            raise ToolValidationError(f"Dependency '{package}' not found")
+        dependencies.remove(package)
+        self._write_pyproject(doc)
+        self._run_uv(["uv", "pip", "uninstall", package, "-y"])
+        return package
+
+    def install_dependencies(self) -> None:
+        self._run_uv(["uv", "sync"])
+
+    def _load_pyproject(self):
+        if not self.pyproject_path.exists():
+            raise ToolValidationError("pyproject.toml not found in workspace.")
+        content = self.pyproject_path.read_text(encoding="utf-8")
+        return tomlkit.parse(content)
+
+    def _write_pyproject(self, doc) -> None:
+        text = tomlkit.dumps(doc)
+        relative_path = str(self.pyproject_path.relative_to(self.workspace.root))
+        self.workspace.write_text(relative_path, text, overwrite=True)
+
+    def _run_uv(self, command: List[str]) -> None:
+        completed = run_subprocess(command, cwd=self.workspace.root)
+        if completed.returncode != 0:
+            raise ToolInternalError(
+                f"Command {' '.join(command)} failed",
+                hint=completed.stderr.strip() or "See stdout/stderr for details.",
+            )
+</file>
+
+<file path="src/codewrite_mcp/exceptions.py">
+"""Custom error types for CodeWrite-MCP."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+
+class MCPError(Exception):
+    """Error type surfaced through the FastMCP server."""
+
+    def __init__(
+        self,
+        code: int,
+        message: str,
+        *,
+        hint: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        error_data: Dict[str, Any] = {}
+        if hint:
+            error_data["hint"] = hint
+        if data:
+            error_data.update(data)
+        self.data = error_data
+
+
+class ToolValidationError(MCPError):
+    """Exception raised for invalid tool inputs."""
+
+    def __init__(self, message: str, *, hint: Optional[str] = None) -> None:
+        super().__init__(4000, message, hint=hint)
+
+
+class ToolInternalError(MCPError):
+    """Exception raised for failures inside a tool implementation."""
+
+    def __init__(self, message: str, *, hint: Optional[str] = None) -> None:
+        super().__init__(5000, message, hint=hint)
+</file>
+
+<file path="src/codewrite_mcp/observability.py">
+"""Observability helpers for logging, tracing, and subprocess instrumentation."""
+
+from __future__ import annotations
+
+import contextvars
+import logging
+import os
+import subprocess
+import time
+import uuid
+from contextlib import nullcontext
+from functools import wraps
+from pathlib import Path
+from typing import Any, Awaitable, Callable, Sequence
+
+from mcp.server.fastmcp import FastMCP
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from pythonjsonlogger.json import JsonFormatter
+
+TRACE_ID = contextvars.ContextVar("codewrite_trace_id", default=None)
+LOGGER = logging.getLogger("codewrite_mcp")
+TRACER = None
+
+
+def configure_logging() -> logging.Logger:
+    """Configure application-wide structured logging."""
+    level = os.environ.get("CW_LOG_LEVEL", "INFO").upper()
+    LOGGER.setLevel(level)
+    if not LOGGER.handlers:
+        handler = logging.StreamHandler()
+        formatter = JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+        handler.setFormatter(formatter)
+        LOGGER.addHandler(handler)
+    return LOGGER
+
+
+def configure_tracing() -> None:
+    """Configure OpenTelemetry tracing when OTEL endpoint is supplied."""
+    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
+        return
+    provider = TracerProvider(resource=Resource.create({"service.name": "codewrite-mcp"}))
+    exporter = OTLPSpanExporter(endpoint=endpoint)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+    global TRACER
+    TRACER = trace.get_tracer("codewrite_mcp")
+
+
+def _with_trace(extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    data: dict[str, Any] = {}
+    if extra:
+        data.update(extra)
+    trace_id = TRACE_ID.get()
+    if trace_id:
+        data.setdefault("trace_id", trace_id)
+    return data
+
+
+def instrumented_tool(server: FastMCP, *tool_args, **tool_kwargs):
+    """Wrap FastMCP tools with structured logging and per-call trace IDs."""
+
+    tool_decorator = server.tool(*tool_args, **tool_kwargs)
+
+    def decorator(func: Callable[..., Awaitable[Any]]):
+        tool_name = tool_kwargs.get("name", func.__name__)
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            trace_id = str(uuid.uuid4())
+            token = TRACE_ID.set(trace_id)
+            start = time.perf_counter()
+            LOGGER.info("tool.start", extra=_with_trace({"tool": tool_name}))
+            try:
+                span_cm = (
+                    TRACER.start_as_current_span(f"tool.{tool_name}") if TRACER else nullcontext()
+                )
+                with span_cm:
+                    result = await func(*args, **kwargs)
+                    duration = time.perf_counter() - start
+                    LOGGER.info(
+                        "tool.success",
+                        extra=_with_trace({"tool": tool_name, "duration": duration}),
+                    )
+                    return result
+            except Exception:
+                duration = time.perf_counter() - start
+                LOGGER.exception(
+                    "tool.error",
+                    extra=_with_trace({"tool": tool_name, "duration": duration}),
+                )
+                raise
+            finally:
+                TRACE_ID.reset(token)
+
+        return tool_decorator(wrapper)
+
+    return decorator
+
+
+def run_subprocess(
+    command: Sequence[str], cwd: Path, *, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Execute a subprocess with logging and safety checks."""
+
+    if not command or not isinstance(command[0], str):
+        raise ValueError("command must be a non-empty sequence of strings")
+    LOGGER.info(
+        "subprocess.start",
+        extra=_with_trace(
+            {"command": command[0], "command_args": command[1:], "cwd": str(cwd)}
+        ),
+    )
+    start = time.perf_counter()
+    span_cm = TRACER.start_as_current_span(f"subprocess.{command[0]}") if TRACER else nullcontext()
+    with span_cm:
+        completed = subprocess.run(
+            list(command),
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    duration = time.perf_counter() - start
+    LOGGER.info(
+        "subprocess.complete",
+        extra=_with_trace(
+            {
+                "command": command[0],
+                "cwd": str(cwd),
+                "duration": duration,
+                "returncode": completed.returncode,
+            }
+        ),
+    )
+    return completed
+
+
+__all__ = ["LOGGER", "configure_logging", "instrumented_tool", "run_subprocess"]
+</file>
+
+<file path="src/codewrite_mcp/verification_engine.py">
+"""Utilities for running verification commands (tests, lint, typecheck)."""
+
+from __future__ import annotations
+
+import time
+from typing import List, Sequence
+
+from .models import Diagnostic, DiagnosticSeverity, TestResult, TestStatus
+from .observability import LOGGER, run_subprocess
+from .workspace_manager import WorkspaceManager
+
+
+class VerificationEngine:
+    """Runs verification commands inside the workspace."""
+
+    def __init__(self, workspace: WorkspaceManager) -> None:
+        self.workspace = workspace
+
+    def run_pytest(self, args: Sequence[str] | None = None) -> TestResult:
+        command = ["uv", "run", "pytest", "-q", *(args or [])]
+        return self._run_command("pytest", command)
+
+    def run_ruff(self, paths: Sequence[str] | None = None) -> TestResult:
+        command = ["uv", "run", "ruff", "check", *(paths or ["."])]
+        return self._run_command("ruff", command)
+
+    def run_mypy(self, paths: Sequence[str] | None = None) -> TestResult:
+        command = ["uv", "run", "mypy", *(paths or ["."])]
+        return self._run_command("mypy", command)
+
+    def _run_command(self, name: str, command: List[str]) -> TestResult:
+        start = time.perf_counter()
+        LOGGER.info(
+            "verification.command",
+            extra={"command_name": name, "command": command},
+        )
+        completed = run_subprocess(command, cwd=self.workspace.root)
+        duration = time.perf_counter() - start
+        status = TestStatus.PASSED if completed.returncode == 0 else TestStatus.FAILED
+        diagnostics = []
+        if completed.returncode != 0:
+            diagnostics.append(
+                Diagnostic(
+                    severity=DiagnosticSeverity.ERROR,
+                    message=f"{name} failed with exit code {completed.returncode}",
+                )
+            )
+        return TestResult(
+            name=name,
+            status=status,
+            duration=duration,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            diagnostics=diagnostics,
+        )
+</file>
+
+<file path="src/codewrite_mcp/workspace_manager.py">
+"""
+Workspace manager responsible for sandboxed atomic file operations.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import List
+
+from gitignore_parser import parse_gitignore
+
+from .models import URI, DirectoryListing, FileMetadata
+
+
+class WorkspaceError(Exception):
+    """Raised when workspace constraints or IO operations fail."""
+
+    def __init__(self, message: str, *, code: str = "WorkspaceError"):
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass
+class WorkspaceConfig:
+    root_path: Path
+    encoding: str = "utf-8"
+    allow_overwrite: bool = True
+
+
+class WorkspaceManager:
+    """Central authority for interacting with the workspace on disk."""
+
+    def __init__(self, root_path: Path | str, *, encoding: str = "utf-8") -> None:
+        root = Path(root_path).expanduser()
+        self.root_path = root.resolve()
+        self.encoding = encoding
+        if not self.root_path.exists():
+            self.root_path.mkdir(parents=True, exist_ok=True)
+        self._gitignore_matcher = self._load_gitignore()
+
+    def _load_gitignore(self):
+        gitignore_path = self.root_path / ".gitignore"
+        if gitignore_path.exists():
+            return parse_gitignore(gitignore_path)
+        return None
+
+    @property
+    def root(self) -> Path:
+        return self.root_path
+
+    def _resolve(self, requested_path: Path | str) -> Path:
+        candidate = Path(requested_path)
+        if candidate.is_absolute():
+            resolved = candidate.resolve(strict=False)
+        else:
+            resolved = (self.root_path / candidate).resolve(strict=False)
+        try:
+            resolved.relative_to(self.root_path)
+        except ValueError as exc:
+            raise WorkspaceError(
+                f"Path {requested_path} escapes the workspace root {self.root_path}",
+                code="PathEscape",
+            ) from exc
+        return resolved
+
+    def read_text(self, relative_path: str) -> str:
+        target = self._resolve(relative_path)
+        if not target.is_file():
+            raise WorkspaceError(f"File not found: {relative_path}", code="NotFound")
+        return target.read_text(encoding=self.encoding)
+
+    def exists(self, relative_path: str) -> bool:
+        target = self._resolve(relative_path)
+        return target.exists()
+
+    def write_text(self, relative_path: str, content: str, *, overwrite: bool = True):
+        target = self._resolve(relative_path)
+        if target.exists() and not overwrite:
+            raise WorkspaceError(f"File already exists: {relative_path}", code="Exists")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        self._atomic_write(target, content)
+
+    def create_file(self, relative_path: str, content: str, *, overwrite: bool = False):
+        self.write_text(relative_path, content, overwrite=overwrite)
+
+    def delete_file(self, relative_path: str):
+        target = self._resolve(relative_path)
+        if not target.exists():
+            raise WorkspaceError(f"File not found: {relative_path}", code="NotFound")
+        if target.is_dir():
+            raise WorkspaceError(
+                f"Path {relative_path} is a directory", code="IsDirectory"
+            )
+        target.unlink()
+
+    def create_directory(self, relative_path: str, *, exist_ok: bool = True):
+        target = self._resolve(relative_path)
+        target.mkdir(parents=True, exist_ok=exist_ok)
+
+    def delete_directory(self, relative_path: str, *, recursive: bool = False):
+        target = self._resolve(relative_path)
+        if not target.exists():
+            raise WorkspaceError(f"Directory not found: {relative_path}", code="NotFound")
+        if not target.is_dir():
+            raise WorkspaceError(
+                f"Path {relative_path} is not a directory", code="NotDirectory"
+            )
+        if recursive:
+            shutil.rmtree(target)
+        else:
+            target.rmdir()
+
+    def stat(self, relative_path: str) -> FileMetadata:
+        target = self._resolve(relative_path)
+        if not target.exists():
+            raise WorkspaceError(f"Path not found: {relative_path}", code="NotFound")
+        stat = target.stat()
+        return FileMetadata(
+            path=URI(self._relative_string(target)),
+            type="directory" if target.is_dir() else "file",
+            size=None if target.is_dir() else stat.st_size,
+            modified_at=datetime.fromtimestamp(stat.st_mtime),
+        )
+
+    def list_directory(
+        self, relative_path: str = ".", *, include_hidden: bool = False
+    ) -> DirectoryListing:
+        target = self._resolve(relative_path)
+        if not target.exists():
+            raise WorkspaceError(f"Directory not found: {relative_path}", code="NotFound")
+        if not target.is_dir():
+            raise WorkspaceError(
+                f"Path {relative_path} is not a directory", code="NotDirectory"
+            )
+
+        entries: List[FileMetadata] = []
+        for child in sorted(target.iterdir(), key=lambda p: p.name.lower()):
+            rel_path = child.relative_to(self.root_path)
+            if not include_hidden and child.name.startswith("."):
+                continue
+            if self._is_ignored(rel_path):
+                continue
+            stat = child.stat()
+            entries.append(
+                FileMetadata(
+                    path=URI(str(rel_path)),
+                    type="directory" if child.is_dir() else "file",
+                    size=None if child.is_dir() else stat.st_size,
+                    modified_at=datetime.fromtimestamp(stat.st_mtime),
+                )
+            )
+
+        return DirectoryListing(path=URI(self._relative_string(target)), entries=entries)
+
+    def _is_ignored(self, relative_path: Path) -> bool:
+        if self._gitignore_matcher is None:
+            return False
+        absolute = (self.root_path / relative_path).resolve()
+        return self._gitignore_matcher(str(absolute))
+
+    def _relative_string(self, target: Path) -> str:
+        if target == self.root_path:
+            return "."
+        return str(target.relative_to(self.root_path))
+
+    def _atomic_write(self, target: Path, content: str) -> None:
+        fd, temp_path = tempfile.mkstemp(dir=str(target.parent))
+        with os.fdopen(fd, "w", encoding=self.encoding) as tmp:
+            tmp.write(content)
+        os.replace(temp_path, target)
+</file>
+
+<file path="src/codewrite_mcp/tools/__init__.py">
+"""Tool package initialization."""
+
+from .code_modification import CodeModificationTools
+from .dependencies import DependencyTools
+from .filesystem import FilesystemTools
+from .structured_data import StructuredDataTools
+from .verification import VerificationTools
+
+__all__ = [
+    "FilesystemTools",
+    "CodeModificationTools",
+    "StructuredDataTools",
+    "VerificationTools",
+    "DependencyTools",
+]
+</file>
+
+<file path="src/codewrite_mcp/tools/filesystem.py">
+"""Filesystem tools implemented for Phase 1 of CodeWrite-MCP."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Iterable, List
+
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from ..exceptions import MCPError, ToolInternalError, ToolValidationError
+from ..models import (
+    URI,
+    DirectoryListing,
+    FileContentsResponse,
+    FileMutationResult,
+    MutationStatus,
+    RawEditOperation,
+    RawEditOperationType,
+)
+from ..observability import instrumented_tool
+from ..workspace_manager import WorkspaceError, WorkspaceManager
+
+
+class FilesystemTools:
+    """Collection of filesystem tool implementations."""
+
+    def __init__(self, workspace: WorkspaceManager) -> None:
+        self.workspace = workspace
+
+    def register(self, server: FastMCP) -> None:
+        """Register tool handlers on the FastMCP server."""
+
+        @instrumented_tool(server, name="codewrite.get_file_contents")
+        async def get_file_contents(
+            path: str = Field(description="Workspace relative file path to read.")
+        ) -> FileContentsResponse:
+            return await self._to_thread(self.read_file, path)
+
+        @instrumented_tool(server, name="codewrite.create_file")
+        async def create_file(
+            path: str = Field(description="Workspace relative file path to create."),
+            content: str = Field(default="", description="Content to write into the file."),
+            overwrite: bool = Field(
+                default=False,
+                description="If false, the operation fails when the file already exists.",
+            ),
+        ) -> FileMutationResult:
+            return await self._to_thread(self.create_file, path, content, overwrite)
+
+        @instrumented_tool(server, name="codewrite.delete_file")
+        async def delete_file(
+            path: str = Field(description="Workspace relative path for the file to delete.")
+        ) -> FileMutationResult:
+            return await self._to_thread(self.delete_file, path)
+
+        @instrumented_tool(server, name="codewrite.edit_raw_file")
+        async def edit_raw_file(
+            path: str = Field(description="Workspace relative path for the file to edit."),
+            operations: List[RawEditOperation] = Field(
+                description="Sequential raw edit operations to apply."
+            ),
+        ) -> FileMutationResult:
+            return await self._to_thread(self.edit_raw_file, path, operations)
+
+        @instrumented_tool(server, name="codewrite.create_directory")
+        async def create_directory(
+            path: str = Field(description="Directory path to create relative to the workspace."),
+            exist_ok: bool = Field(
+                default=True,
+                description="If false, the tool raises when the directory already exists.",
+            ),
+        ) -> FileMutationResult:
+            return await self._to_thread(self.create_directory, path, exist_ok)
+
+        @instrumented_tool(server, name="codewrite.delete_directory")
+        async def delete_directory(
+            path: str = Field(description="Directory path to delete."),
+            recursive: bool = Field(
+                default=False,
+                description="Remove non-empty directories when True.",
+            ),
+        ) -> FileMutationResult:
+            return await self._to_thread(self.delete_directory, path, recursive)
+
+        @instrumented_tool(server, name="codewrite.list_directory")
+        async def list_directory(
+            path: str = Field(
+                default=".",
+                description="Directory to list relative to the workspace root.",
+            ),
+            include_hidden: bool = Field(
+                default=False, description="Include dotfiles when true."
+            ),
+        ) -> DirectoryListing:
+            return await self._to_thread(self.list_directory, path, include_hidden)
+
+    async def _to_thread(self, func, *args):
+        return await asyncio.to_thread(self._wrap_errors, func, *args)
+
+    def _wrap_errors(self, func, *args):
+        try:
+            return func(*args)
+        except WorkspaceError as exc:
+            raise self._map_workspace_error(exc) from exc
+
+    def _map_workspace_error(self, exc: WorkspaceError) -> MCPError:
+        validation_codes = {
+            "NotFound",
+            "Exists",
+            "PathEscape",
+            "IsDirectory",
+            "NotDirectory",
+        }
+        if exc.code in validation_codes:
+            return ToolValidationError(str(exc))
+        return ToolInternalError(str(exc))
+
+    def read_file(self, path: str) -> FileContentsResponse:
+        content = self.workspace.read_text(path)
+        metadata = self.workspace.stat(path)
+        size = len(content.encode(self.workspace.encoding))
+        return FileContentsResponse(
+            path=metadata.path,
+            content=content,
+            encoding=self.workspace.encoding,
+            size=size,
+            modified_at=metadata.modified_at,
+        )
+
+    def create_file(self, path: str, content: str, overwrite: bool) -> FileMutationResult:
+        existed = self.workspace.exists(path)
+        self.workspace.create_file(path, content, overwrite=overwrite)
+        status = MutationStatus.UPDATED if existed else MutationStatus.CREATED
+        return FileMutationResult(
+            path=URI(path),
+            status=status,
+            message=f"Wrote {len(content)} bytes to {path}",
+        )
+
+    def delete_file(self, path: str) -> FileMutationResult:
+        self.workspace.delete_file(path)
+        return FileMutationResult(
+            path=URI(path),
+            status=MutationStatus.DELETED,
+            message=f"Deleted {path}",
+        )
+
+    def edit_raw_file(
+        self, path: str, operations: Iterable[RawEditOperation]
+    ) -> FileMutationResult:
+        operations = list(operations)
+        if not operations:
+            raise ToolValidationError("At least one edit operation is required.")
+        content = self.workspace.read_text(path)
+        updated = self._apply_raw_edits(content, operations)
+        self.workspace.write_text(path, updated, overwrite=True)
+        return FileMutationResult(
+            path=URI(path),
+            status=MutationStatus.UPDATED,
+            message=f"Applied {len(operations)} edit operations to {path}",
+        )
+
+    def create_directory(self, path: str, exist_ok: bool) -> FileMutationResult:
+        self.workspace.create_directory(path, exist_ok=exist_ok)
+        return FileMutationResult(
+            path=URI(path),
+            status=MutationStatus.CREATED,
+            message=f"Created directory {path}",
+        )
+
+    def delete_directory(self, path: str, recursive: bool) -> FileMutationResult:
+        self.workspace.delete_directory(path, recursive=recursive)
+        return FileMutationResult(
+            path=URI(path),
+            status=MutationStatus.DELETED,
+            message=f"Removed directory {path}",
+        )
+
+    def list_directory(self, path: str, include_hidden: bool) -> DirectoryListing:
+        return self.workspace.list_directory(path, include_hidden=include_hidden)
+
+    def _apply_raw_edits(
+        self, content: str, operations: Iterable[RawEditOperation]
+    ) -> str:
+        updated = content
+        for op in operations:
+            updated = self._apply_single_edit(updated, op)
+        return updated
+
+    def _apply_single_edit(self, content: str, operation: RawEditOperation) -> str:
+        if operation.type in {
+            RawEditOperationType.REPLACE,
+            RawEditOperationType.DELETE,
+            RawEditOperationType.INSERT,
+        }:
+            if operation.range is None:
+                raise ToolValidationError(
+                    "range is required for insert/replace/delete operations"
+                )
+            start_index, end_index = self._range_to_indexes(content, operation.range)
+            if operation.type == RawEditOperationType.INSERT:
+                return content[:start_index] + operation.content + content[start_index:]
+            if operation.type == RawEditOperationType.REPLACE:
+                return content[:start_index] + operation.content + content[end_index:]
+            return content[:start_index] + content[end_index:]
+        raise ToolValidationError(f"Unsupported edit type: {operation.type!s}")
+
+    def _range_to_indexes(self, content: str, range_) -> tuple[int, int]:
+        start = self._line_char_to_index(content, range_.start_line, range_.start_char)
+        end = self._line_char_to_index(content, range_.end_line, range_.end_char)
+        if end < start:
+            raise ToolValidationError("Line range end precedes start.")
+        return start, end
+
+    def _line_char_to_index(self, content: str, line: int, char: int) -> int:
+        if line < 1:
+            raise ToolValidationError("line must be >= 1")
+        # Build an array with every line including delimiters
+        lines = content.splitlines(keepends=True)
+        if line - 1 > len(lines):
+            if line - 1 == len(lines) and char == 0:
+                return len(content)
+            raise ToolValidationError("Line exceeds document length.")
+        if line - 1 == len(lines):
+            if char != 0:
+                raise ToolValidationError("char must be 0 when pointing to EOF sentinel.")
+            return len(content)
+        current_line = lines[line - 1]
+        if char > len(current_line):
+            raise ToolValidationError("char exceeds line length.")
+        prefix = "".join(lines[: line - 1])
+        return len(prefix) + char
+</file>
+
+<file path="src/codewrite_mcp/language_handlers/__init__.py">
+"""Language handler package."""
+
+from .python_handler import PythonHandler
+from .typescript_handler import TypeScriptHandler
+
+__all__ = ["PythonHandler", "TypeScriptHandler"]
+</file>
+
+<file path="src/codewrite_mcp/language_handlers/typescript_handler.py">
+"""TypeScript handler bridge (stub)."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import threading
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Optional
+
+from ..exceptions import ToolInternalError
+from ..workspace_manager import WorkspaceManager
+
+
+@dataclass
+class NodeBridge:
+    script_path: Path
+    process: Optional[subprocess.Popen[str]] = field(init=False, default=None)
+    lock: threading.Lock = field(init=False, default_factory=threading.Lock)
+
+    def start(self) -> None:
+        if self.process:
+            return
+        self.process = subprocess.Popen(
+            ["node", str(self.script_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+
+    def request(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.process or not self.process.stdin or not self.process.stdout:
+            raise ToolInternalError("TypeScript bridge not started.")
+        with self.lock:
+            message = json.dumps(payload)
+            self.process.stdin.write(message + "\n")
+            self.process.stdin.flush()
+            line = self.process.stdout.readline()
+        if not line:
+            raise ToolInternalError("TypeScript agent closed unexpectedly.")
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ToolInternalError("Invalid response from TypeScript agent.") from exc
+
+    def stop(self) -> None:
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+            self.process = None
+
+
+@dataclass
+class TypeScriptHandler:
+    workspace: WorkspaceManager
+    agent_path: Path
+    bridge: NodeBridge = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.bridge = NodeBridge(self.agent_path)
+        try:
+            self.bridge.start()
+        except FileNotFoundError as exc:
+            raise ToolInternalError("Node.js runtime is required for TypeScript handler.") from exc
+
+    def add_function(self, path: str, code: str) -> None:
+        source = self._read_source(path)
+        result = self._send(
+            "addFunction",
+            {"path": path, "code": code, "source": source},
+        )
+        self._write_result(result, path)
+
+    def add_class(self, path: str, code: str) -> None:
+        source = self._read_source(path)
+        result = self._send(
+            "addClass",
+            {"path": path, "code": code, "source": source},
+        )
+        self._write_result(result, path)
+
+    def delete_symbol(self, path: str, name: str) -> None:
+        source = self._read_source(path)
+        result = self._send("deleteSymbol", {"name": name, "source": source})
+        self._write_result(result, path)
+
+    def rename_symbol(self, path: str, name: str, new_name: str) -> None:
+        source = self._read_source(path)
+        result = self._send(
+            "renameSymbol",
+            {"name": name, "newName": new_name, "source": source},
+        )
+        self._write_result(result, path)
+
+    def move_symbol(
+        self,
+        source_path: str,
+        dest_path: str,
+        name: str,
+    ) -> None:
+        source = self._read_source(source_path)
+        destination_source = self._read_source(dest_path)
+        result = self._send(
+            "moveSymbol",
+            {
+                "name": name,
+                "source": source,
+                "destinationSource": destination_source,
+            },
+        )
+        source_content = result.get("sourceContent")
+        dest_content = result.get("destinationContent")
+        if not isinstance(source_content, str) or not isinstance(dest_content, str):
+            raise ToolInternalError("TypeScript agent returned invalid move result.")
+        self.workspace.write_text(source_path, source_content, overwrite=True)
+        self.workspace.write_text(dest_path, dest_content, overwrite=True)
+
+    def _read_source(self, path: str) -> str:
+        return self.workspace.read_text(path) if self.workspace.exists(path) else ""
+
+    def _send(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        response = self.bridge.request(
+            {"id": str(uuid.uuid4()), "method": method, "params": params}
+        )
+        return self._handle_response(response)
+
+    def _write_result(self, result: dict[str, Any], path: str) -> None:
+        content = result.get("content")
+        if not isinstance(content, str):
+            raise ToolInternalError("TypeScript agent returned invalid content.")
+        self.workspace.write_text(path, content, overwrite=True)
+
+    def _handle_response(self, response: dict[str, Any]) -> dict[str, Any]:
+        if "error" in response:
+            raise ToolInternalError(
+                response["error"].get("message", "TypeScript operation failed.")
+            )
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise ToolInternalError("TypeScript agent returned invalid payload.")
+        return result
+</file>
+
+<file path="src/codewrite_mcp/tools/code_modification.py">
+"""AST-aware Python code modification tools."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import List
+
+from mcp.server.fastmcp import FastMCP
+from pydantic import Field
+
+from ..exceptions import ToolValidationError
+from ..language_handlers import PythonHandler
+from ..language_handlers.typescript_handler import TypeScriptHandler
+from ..models import (
+    URI,
+    FileMutationResult,
+    InsertionPoint,
+    MutationStatus,
+    SymbolSelector,
+)
+from ..observability import instrumented_tool
+from ..workspace_manager import WorkspaceError, WorkspaceManager
+
+
+class CodeModificationTools:
+    """Registers AST-aware tools for Python and TypeScript modifications."""
+
+    def __init__(
+        self,
+        workspace: WorkspaceManager,
+        handler: PythonHandler,
+        ts_handler: TypeScriptHandler | None = None,
+    ) -> None:
+        self.workspace = workspace
+        self.python = handler
+        self.ts_handler = ts_handler
+
+    def register(self, server: FastMCP) -> None:
+        @instrumented_tool(server, name="codewrite.add_function")
+        async def add_function(
+            path: str = Field(description="Target file to modify."),
+            code: str = Field(description="Function definition to insert."),
+            insertion_point: InsertionPoint = Field(
+                default_factory=InsertionPoint,
+                description="Where the function should be inserted.",
+            ),
+        ) -> FileMutationResult:
+            if self._use_typescript_handler(path):
+                await self._to_thread(self.ts_handler.add_function, path, code)  # type: ignore[arg-type]
+            else:
+                await self._to_thread(self.python.insert_code, path, code, insertion_point)
+            return FileMutationResult(
+                path=URI(path),
+                status=MutationStatus.UPDATED,
+                message=f"Inserted function into {path}",
+            )
+
+        @instrumented_tool(server, name="codewrite.add_class")
+        async def add_class(
+            path: str = Field(description="Target file to modify."),
+            code: str = Field(description="Class definition to insert."),
+            insertion_point: InsertionPoint = Field(
+                default_factory=InsertionPoint,
+                description="Where the class should be inserted.",
+            ),
+        ) -> FileMutationResult:
+            if self._use_typescript_handler(path):
+                await self._to_thread(self.ts_handler.add_function, path, code)  # type: ignore[arg-type]
+            else:
+                await self._to_thread(self.python.insert_code, path, code, insertion_point)
+            return FileMutationResult(
+                path=URI(path),
+                status=MutationStatus.UPDATED,
+                message=f"Inserted class into {path}",
+            )
+
+        @instrumented_tool(server, name="codewrite.delete_symbol")
+        async def delete_symbol(
+            selector: SymbolSelector = Field(description="Symbol selector for deletion.")
+        ) -> FileMutationResult:
+            path = self._selector_path(selector)
+            if self._use_typescript_handler(path):
+                name = self._ts_name(selector)
+                await self._to_thread(self.ts_handler.delete_symbol, path, name)  # type: ignore[arg-type]
+            else:
+                await self._to_thread(self.python.delete_symbol, selector)
+            return FileMutationResult(
+                path=selector.file,
+                status=MutationStatus.DELETED,
+                message=f"Removed symbol from {selector.file.root}",
+            )
+
+        @instrumented_tool(server, name="codewrite.rename_symbol")
+        async def rename_symbol(
+            selector: SymbolSelector = Field(
+                description="Symbol selector for the definition to rename."
+            ),
+            new_name: str = Field(description="New identifier to assign."),
+        ) -> FileMutationResult:
+            path = self._selector_path(selector)
+            if self._use_typescript_handler(path):
+                name = self._ts_name(selector)
+                await self._to_thread(
+                    self.ts_handler.rename_symbol, path, name, new_name  # type: ignore[arg-type]
+                )
+            else:
+                await self._to_thread(self.python.rename_symbol, selector, new_name)
+            return FileMutationResult(
+                path=selector.file,
+                status=MutationStatus.UPDATED,
+                message=f"Renamed symbol to {new_name}",
+            )
+
+        @instrumented_tool(server, name="codewrite.move_symbol")
+        async def move_symbol(
+            selector: SymbolSelector = Field(description="Symbol to move."),
+            destination_path: str = Field(description="Destination module for the symbol."),
+            insertion_point: InsertionPoint = Field(
+                default_factory=InsertionPoint,
+                description="Where to place the symbol in the destination file.",
+            ),
+        ) -> List[FileMutationResult]:
+            path = self._selector_path(selector)
+            if self._use_typescript_handler(path) and self._use_typescript_handler(
+                destination_path
+            ):
+                name = self._ts_name(selector)
+                await self._to_thread(
+                    self.ts_handler.move_symbol,  # type: ignore[arg-type]
+                    path,
+                    destination_path,
+                    name,
+                )
+                source_path, dest_path = path, destination_path
+            else:
+                source_path, dest_path = await self._to_thread(
+                    self.python.move_symbol, selector, destination_path, insertion_point
+                )
+            return [
+                FileMutationResult(
+                    path=URI(source_path),
+                    status=MutationStatus.UPDATED,
+                    message=f"Removed symbol from {source_path}",
+                ),
+                FileMutationResult(
+                    path=URI(dest_path),
+                    status=MutationStatus.UPDATED,
+                    message=f"Inserted symbol into {dest_path}",
+                ),
+            ]
+
+    async def _to_thread(self, func, *args):
+        return await asyncio.to_thread(self._wrap_errors, func, *args)
+
+    def _wrap_errors(self, func, *args):
+        try:
+            return func(*args)
+        except WorkspaceError as exc:
+            raise ToolValidationError(str(exc)) from exc
+
+    def _selector_path(self, selector: SymbolSelector) -> str:
+        if not selector.file:
+            raise ToolValidationError("Symbol selector must include a file path.")
+        return selector.file.root
+
+    def _use_typescript_handler(self, path: str) -> bool:
+        return bool(self.ts_handler and path.endswith((".ts", ".tsx")))
+
+    def _ts_name(self, selector: SymbolSelector) -> str:
+        if selector.name:
+            return selector.name
+        if selector.fqn:
+            return selector.fqn.root.split(".")[-1]
+        raise ToolValidationError("TypeScript selectors must include a name or FQN.")
+</file>
+
+<file path="src/codewrite_mcp/server.py">
+"""FastMCP server bootstrap for CodeWrite-MCP Phase 1."""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import AsyncIterator
+
+from mcp.server.fastmcp import FastMCP
+
+from .dependency_manager import DependencyManager
+from .exceptions import MCPError, ToolInternalError
+from .language_handlers import PythonHandler, TypeScriptHandler
+from .observability import LOGGER, configure_logging, configure_tracing
+from .structured_data_handler import StructuredDataHandler
+from .tools.code_modification import CodeModificationTools
+from .tools.dependencies import DependencyTools
+from .tools.filesystem import FilesystemTools
+from .tools.structured_data import StructuredDataTools
+from .tools.verification import VerificationTools
+from .verification_engine import VerificationEngine
+from .workspace_manager import WorkspaceManager
+
+configure_logging()
+configure_tracing()
+
+
+@dataclass
+class AppContext:
+    workspace: WorkspaceManager
+    filesystem_tools: FilesystemTools
+    python_handler: PythonHandler
+    typescript_handler: TypeScriptHandler | None
+    code_tools: CodeModificationTools
+    structured_data_handler: StructuredDataHandler
+    structured_data_tools: StructuredDataTools
+    verification_engine: VerificationEngine
+    verification_tools: VerificationTools
+    dependency_manager: DependencyManager
+    dependency_tools: DependencyTools
+
+
+def _workspace_root() -> Path:
+    root = os.environ.get("CW_WORKSPACE_ROOT")
+    if root:
+        return Path(root)
+    return Path.cwd()
+
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+    LOGGER.info("Starting CodeWrite-MCP server", extra={"workspace_root": str(_workspace_root())})
+    workspace = WorkspaceManager(_workspace_root())
+    filesystem_tools = FilesystemTools(workspace)
+    filesystem_tools.register(server)
+    python_handler = PythonHandler(workspace)
+    ts_handler = None
+    agent_path = Path(__file__).resolve().parent.parent / "nodescripts" / "typescript-agent.js"
+    if agent_path.exists():
+        try:
+            ts_handler = TypeScriptHandler(workspace, agent_path)
+        except ToolInternalError:
+            LOGGER.warning("TypeScript handler unavailable; continuing without it.")
+    code_tools = CodeModificationTools(workspace, python_handler, ts_handler)
+    code_tools.register(server)
+    structured_data_handler = StructuredDataHandler(workspace)
+    structured_data_tools = StructuredDataTools(structured_data_handler)
+    structured_data_tools.register(server)
+    verification_engine = VerificationEngine(workspace)
+    verification_tools = VerificationTools(verification_engine)
+    verification_tools.register(server)
+    dependency_manager = DependencyManager(workspace)
+    dependency_tools = DependencyTools(dependency_manager)
+    dependency_tools.register(server)
+    server.workspace_manager = workspace  # type: ignore[attr-defined]
+    server.filesystem_tools = filesystem_tools  # type: ignore[attr-defined]
+    server.python_handler = python_handler  # type: ignore[attr-defined]
+    server.code_tools = code_tools  # type: ignore[attr-defined]
+    server.structured_data_handler = structured_data_handler  # type: ignore[attr-defined]
+    server.structured_data_tools = structured_data_tools  # type: ignore[attr-defined]
+    server.verification_engine = verification_engine  # type: ignore[attr-defined]
+    server.verification_tools = verification_tools  # type: ignore[attr-defined]
+    server.dependency_manager = dependency_manager  # type: ignore[attr-defined]
+    server.dependency_tools = dependency_tools  # type: ignore[attr-defined]
+
+    try:
+        yield AppContext(
+            workspace=workspace,
+            filesystem_tools=filesystem_tools,
+            python_handler=python_handler,
+            typescript_handler=ts_handler,
+            code_tools=code_tools,
+            structured_data_handler=structured_data_handler,
+            structured_data_tools=structured_data_tools,
+            verification_engine=verification_engine,
+            verification_tools=verification_tools,
+            dependency_manager=dependency_manager,
+            dependency_tools=dependency_tools,
+        )
+    finally:
+        LOGGER.info("CodeWrite-MCP server shutdown")
+
+
+server = FastMCP("CodeWriteMCP", lifespan=lifespan)
+
+
+def main() -> None:
+    """Entry point used by `uv run codewrite-mcp`."""
+    transport = os.environ.get("CW_SERVER_TRANSPORT", "stdio").lower()
+    try:
+        if transport == "stdio":
+            server.run()
+        elif transport == "sse":
+            asyncio.run(server.run_sse_async())
+        elif transport in {"streamable-http", "http"}:
+            asyncio.run(server.run_streamable_http_async())
+        else:
+            raise MCPError(4000, f"Unsupported transport: {transport}")
+    except MCPError as exc:
+        LOGGER.error("MCP runtime error: %s", exc, extra={"code": getattr(exc, 'code', 'n/a')})
+        raise
+</file>
+
+</files>
