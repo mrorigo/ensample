@@ -1,18 +1,18 @@
-# MDAPFlow-MCP: Detailed Implementation Plan
+# Ensample: Detailed Implementation Plan
 
 ## 1. Introduction & Project Goals
 
-This document provides a detailed, phased implementation plan for `MDAPFlow-MCP`, a standalone Model Context Protocol (MCP) server dedicated to executing Massively Decomposed Agentic Processes (MDAPs) for highly reliable LLM-driven responses. This plan translates the `MDAPFlow-MCP` specification into actionable development phases, ensuring a robust, scalable, and observable implementation.
+This document provides a detailed, phased implementation plan for `Ensample`, a standalone Model Context Protocol (MCP) server dedicated to executing Massively Decomposed Agentic Processes (MDAPs) for highly reliable LLM-driven responses. This plan translates the `Ensample` specification into actionable development phases, ensuring a robust, scalable, and observable implementation.
 
 **Key Objectives:**
-*   Implement all core components of the `MDAPFlow-MCP` specification, including LLM provider integration, ensemble management, red-flagging, output parsing, the "first-to-ahead-by-k" voting mechanism, and the fast-path controller.
+*   Implement all core components of the `Ensample` specification, including LLM provider integration, ensemble management, red-flagging, output parsing, the "first-to-ahead-by-k" voting mechanism, and the fast-path controller.
 *   Ensure the server is performant, scalable, and resilient for production use by any client system requiring high-assurance LLM outputs.
 *   Integrate comprehensive observability (OpenTelemetry tracing, structured logging, Prometheus metrics) to provide deep insights into MDAP execution.
 *   Deliver a fully testable and containerizable service.
 
 ## 2. Core Principles & Architecture
 
-The implementation will strictly adhere to the architectural principles defined in the `MDAPFlow-MCP` specification, focusing on modularity, asynchronous processing, and robust error handling at every layer. The architecture shown in the spec guides the component breakdown.
+The implementation will strictly adhere to the architectural principles defined in the `Ensample` specification, focusing on modularity, asynchronous processing, and robust error handling at every layer. The architecture shown in the spec guides the component breakdown.
 
 ## 3. High-Level Phased Implementation Plan
 
@@ -48,7 +48,7 @@ Development will proceed in six focused phases to manage complexity, ensure a lo
 
 1.  **Project Scaffolding:**
     *   Initialize a Python project with `uv` for dependency management.
-    *   Establish project structure: `mdapflow-mcp/`, `src/mdapflow_mcp/`, `tests/`, `pyproject.toml`.
+    *   Establish project structure: `Ensample/`, `src/mdapflow_mcp/`, `tests/`, `pyproject.toml`.
     *   Create base modules: `observability.py` (for structured logging setup), `exceptions.py` (custom exceptions), `config.py` (Pydantic `BaseSettings` for env vars).
 
 2.  **MCP Server Core (`src/mdapflow_mcp/server.py`):**
@@ -186,5 +186,5 @@ Development will proceed in six focused phases to manage complexity, ensure a lo
 
 *   **Unit Tests:** Each module (e.g., `llm_provider.py`, `red_flagging_engine.py`, `output_parser.py`, `voting_mechanism.py`) will be thoroughly tested in isolation with mocked dependencies (e.g., mocked LLM responses, mocked API calls). This includes edge cases for voting, various red-flag scenarios, and parser failures.
 *   **Integration Tests:** Each MCP tool will be tested end-to-end. For example, `mdapflow.execute_llm_role` will be tested with a full flow from prompt input, through ensemble calls, red-flagging, voting, and fast-path scenarios. This will involve using a local test `FastMCP` client to interact with the server.
-*   **Performance Tests:** Load testing will be conducted to assess `MDAPFlow-MCP`'s performance under various loads, concurrent requests, and different MDAP configurations (e.g., varying `voting_k`, ensemble sizes).
+*   **Performance Tests:** Load testing will be conducted to assess `Ensample`'s performance under various loads, concurrent requests, and different MDAP configurations (e.g., varying `voting_k`, ensemble sizes).
 *   **Observability Validation:** Tests will verify that OpenTelemetry traces and Prometheus metrics are correctly emitted and contain the expected data and attributes for various execution paths, including successful runs, red-flag hits, and failures.

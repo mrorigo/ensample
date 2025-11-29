@@ -1,10 +1,10 @@
-# MDAPFlow-MCP: Massively Decomposed Agentic Processes (MDAPs) Execution Engine Specification
+# Ensample: Massively Decomposed Agentic Processes (MDAPs) Execution Engine Specification
 
 ## 1. Introduction & Purpose
 
-`MDAPFlow-MCP` is a specialized Model Context Protocol (MCP) server designed to provide **highly reliable LLM-driven responses**. It centralizes and operationalizes the principles of **Massively Decomposed Agentic Processes (MDAPs)**, as outlined in "Solving a Million-Step LLM Task with Zero Errors" (Meyerson et al., 2025).
+`Ensample` is a specialized Model Context Protocol (MCP) server designed to provide **highly reliable LLM-driven responses**. It centralizes and operationalizes the principles of **Massively Decomposed Agentic Processes (MDAPs)**, as outlined in "Solving a Million-Step LLM Task with Zero Errors" (Meyerson et al., 2025).
 
-Clients of `MDAPFlow-MCP` (which could be any agentic system, orchestration layer, or application) can delegate complex LLM interactions, ensemble sampling, voting, and red-flagging to this server. This allows client systems to abstract away the intricacies of achieving high-assurance LLM outputs and focus on their core business logic.
+Clients of `Ensample` (which could be any agentic system, orchestration layer, or application) can delegate complex LLM interactions, ensemble sampling, voting, and red-flagging to this server. This allows client systems to abstract away the intricacies of achieving high-assurance LLM outputs and focus on their core business logic.
 
 **Key Objectives:**
 *   **Decouple LLM Reliability from Client Logic:** Abstract away the complexity of MDAP execution, allowing client systems to focus on their primary task workflows.
@@ -15,11 +15,11 @@ Clients of `MDAPFlow-MCP` (which could be any agentic system, orchestration laye
 
 ## 2. Architecture Overview (FastMCP Server)
 
-`MDAPFlow-MCP` is implemented as a **FastMCP server** designed for high-performance, asynchronous MDAP execution.
+`Ensample` is implemented as a **FastMCP server** designed for high-performance, asynchronous MDAP execution.
 
 ```mermaid
 graph TD
-    subgraph MDAPFlowMCP_Server [MDAPFlow-MCP Server]
+    subgraph MDAPFlowMCP_Server [Ensample Server]
         direction TB
         MCPServerCore[MCP Server Core - FastMCP]
         ToolExecutor[Tool Executor - `execute_llm_role` Logic]
@@ -44,7 +44,7 @@ graph TD
 
 ### 2.1 Architectural Principles
 
-1.  **MDAP-First Reliability:** Every LLM decision processed by `MDAPFlow-MCP` is subjected to MDAP principles unless explicitly overridden by a fast-path directive.
+1.  **MDAP-First Reliability:** Every LLM decision processed by `Ensample` is subjected to MDAP principles unless explicitly overridden by a fast-path directive.
 2.  **Configurable Ensemble:** Supports dynamic configuration of LLM ensembles (mix of models, temperatures, etc.) to optimize for cost, performance, and error decorrelation.
 3.  **Parallel Execution:** Designed to execute multiple LLM calls for ensemble voting in parallel to minimize wall-clock time.
 4.  **Proactive Error Mitigation:** Integrates a Red-Flagging Engine to discard unreliable LLM outputs early, improving the efficiency and accuracy of voting.
@@ -53,7 +53,7 @@ graph TD
 
 ## 3. Common Data Types (Pydantic Models)
 
-These are the core schemas used in tool inputs and outputs for `MDAPFlow-MCP`.
+These are the core schemas used in tool inputs and outputs for `Ensample`.
 
 ```python
 from pydantic import BaseModel, Field, conlist, NonNegativeInt, HttpUrl, confloat
@@ -126,7 +126,7 @@ class MDAPOutput(BaseModel):
 
 ## 4. Server Tools (MCP Protocol)
 
-`MDAPFlow-MCP` exposes the following tools to its clients.
+`Ensample` exposes the following tools to its clients.
 
 ### 4.1 `mdapflow.execute_llm_role`
 The primary tool for invoking LLM roles with MDAP reliability.
@@ -160,7 +160,7 @@ Standard MCP health check tool.
 
 ## 5. Internal Logic & Workflow
 
-`MDAPFlow-MCP` orchestrates a sophisticated internal workflow to achieve reliable LLM outputs.
+`Ensample` orchestrates a sophisticated internal workflow to achieve reliable LLM outputs.
 
 ### 5.1 LLM Provider Interface
 *   **Purpose:** Manages connections and API calls to diverse external LLM providers (e.g., OpenAI, Anthropic, Together.ai, custom endpoints).
@@ -203,7 +203,7 @@ Standard MCP health check tool.
 
 ## 6. Configuration and Observability
 
-`MDAPFlow-MCP` is highly configurable via environment variables and extensively instrumented for observability.
+`Ensample` is highly configurable via environment variables and extensively instrumented for observability.
 
 ### 6.1 Configuration
 
@@ -212,7 +212,7 @@ Standard MCP health check tool.
 | `MDAP_DEFAULT_ENSEMBLE_CONFIG_PATH` | Path to a JSON file defining the default `EnsembleConfig`. | `None` |
 | `MDAP_DEFAULT_RED_FLAG_CONFIG_PATH` | Path to a JSON file defining the default `RedFlagConfig`. | `None` |
 | `MDAP_DEFAULT_VOTING_K` | Default `k` value if not specified in `MDAPInput`. | `3` |
-| `MDAP_MAX_CONCURRENT_LLM_CALLS` | Maximum number of parallel LLM calls `MDAPFlow-MCP` will make. | `10` |
+| `MDAP_MAX_CONCURRENT_LLM_CALLS` | Maximum number of parallel LLM calls `Ensample` will make. | `10` |
 | `MDAP_MAX_VOTING_ROUNDS` | Maximum voting rounds before MDAP times out and returns an error. | `20` |
 | `MDAP_LOG_LEVEL` | Logging verbosity (`DEBUG`, `INFO`, etc.). | `INFO` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Enables **OpenTelemetry** distributed tracing. | `unset` |
