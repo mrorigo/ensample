@@ -24,7 +24,7 @@ from .models import TokenUsage
 
 TRACE_ID = contextvars.ContextVar("mdapflow_trace_id", default=None)
 MDAP_EXECUTION_ID = contextvars.ContextVar("mdapflow_execution_id", default="")
-LOGGER = logging.getLogger("mdapflow_mcp")
+LOGGER = logging.getLogger("ensample")
 TRACER = None
 
 
@@ -50,7 +50,7 @@ def configure_tracing() -> None:
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     global TRACER
-    TRACER = trace.get_tracer("mdapflow_mcp")
+    TRACER = trace.get_tracer("ensample")
 
 
 def _with_trace(extra: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -25,7 +25,7 @@ class MaintenanceTools:
     def register(self, server: FastMCP) -> None:
         """Register maintenance tools with the FastMCP server."""
 
-        @instrumented_tool(server, name="mdapflow.ping")
+        @instrumented_tool(server, name="ensample.ping")
         async def ping() -> dict[str, Any]:
             """Health check and server status."""
             uptime_seconds = int(time.time() - self._start_time)
@@ -42,20 +42,20 @@ class MaintenanceTools:
 
             return {
                 "status": "ok",
-                "message": "MDAPFlow-MCP server is running",
+                "message": "Ensample server is running",
                 "uptime": uptime_str,
                 "mdap_config_loaded": config_status == "loaded",
                 "config_status": config_status,
                 "version": "0.1.0",
             }
 
-        @instrumented_tool(server, name="mdapflow.server_info")
+        @instrumented_tool(server, name="ensample.server_info")
         async def server_info() -> dict[str, Any]:
             """Get detailed server information."""
             return {
-                "server_name": "MDAPFlow-MCP",
+                "server_name": "Ensample",
                 "version": "0.1.0",
-                "description": "Massively Decomposed Agentic Processes (MDAPs) Execution Engine",
+                "description": "Ensemble-based LLM Orchestration with Massively Decomposed Agentic Processes",
                 "max_concurrent_llm_calls": self.settings.MDAP_MAX_CONCURRENT_LLM_CALLS,
                 "max_voting_rounds": self.settings.MDAP_MAX_VOTING_ROUNDS,
                 "default_voting_k": self.settings.MDAP_DEFAULT_VOTING_K,

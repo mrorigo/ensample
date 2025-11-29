@@ -6,8 +6,8 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any
 
-from src.mdapflow_mcp.mdap_engine import MDAPEngine
-from src.mdapflow_mcp.models import (
+from src.ensample.mdap_engine import MDAPEngine
+from src.ensample.models import (
     MDAPInput,
     MDAPOutput,
     MDAPMetrics,
@@ -19,7 +19,7 @@ from src.mdapflow_mcp.models import (
     LLMResponse,
     TokenUsage,
 )
-from src.mdapflow_mcp.config import Settings
+from src.ensample.config import Settings
 
 
 # Mock OpenTelemetry components for testing
@@ -35,7 +35,7 @@ def mock_tracer():
     mock_tracer.start_as_current_span.return_value.__enter__.return_value = mock_span
     mock_tracer.start_as_current_span.return_value.__exit__.return_value = None
     
-    with patch('src.mdapflow_mcp.mdap_engine.TRACER', mock_tracer):
+    with patch('src.ensample.mdap_engine.TRACER', mock_tracer):
         yield mock_tracer
 
 
@@ -61,9 +61,9 @@ class TestMDAPEngineInitialization:
         
         assert engine.settings is custom_settings
 
-    @patch('src.mdapflow_mcp.mdap_engine.load_ensemble_config')
-    @patch('src.mdapflow_mcp.mdap_engine.create_default_ensemble_config')
-    @patch('src.mdapflow_mcp.mdap_engine.create_default_red_flag_config')
+    @patch('src.ensample.mdap_engine.load_ensemble_config')
+    @patch('src.ensample.mdap_engine.create_default_ensemble_config')
+    @patch('src.ensample.mdap_engine.create_default_red_flag_config')
     def test_load_default_configs_success(self, mock_create_red_flag, mock_create_ensemble, mock_load_ensemble):
         """Test successful loading of default configurations."""
         # Setup mocks
@@ -103,9 +103,9 @@ class TestMDAPEngineInitialization:
         assert engine.default_red_flag_config is not None
         assert engine.red_flag_engine.config == engine.default_red_flag_config
 
-    @patch('src.mdapflow_mcp.mdap_engine.load_ensemble_config')
-    @patch('src.mdapflow_mcp.mdap_engine.create_default_ensemble_config')
-    @patch('src.mdapflow_mcp.mdap_engine.create_default_red_flag_config')
+    @patch('src.ensample.mdap_engine.load_ensemble_config')
+    @patch('src.ensample.mdap_engine.create_default_ensemble_config')
+    @patch('src.ensample.mdap_engine.create_default_red_flag_config')
     def test_load_default_configs_exception_fallback(self, mock_create_red_flag, mock_create_ensemble, mock_load_ensemble):
         """Test fallback to created defaults when loading fails."""
         # Setup mocks to raise exception

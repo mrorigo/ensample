@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.mdapflow_mcp.metrics import (
+from src.ensample.metrics import (
     MetricsCollector,
     metrics_collector,
     get_metrics_handler,
@@ -61,8 +61,8 @@ class TestExecutionRecording:
         """Test recording execution start."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_total.inc') as mock_total_inc, \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.inc') as mock_active_inc:
+        with patch('src.ensample.metrics.mdap_execution_total.inc') as mock_total_inc, \
+             patch('src.ensample.metrics.mdap_active_executions.inc') as mock_active_inc:
             
             collector.record_execution_start()
             
@@ -75,12 +75,12 @@ class TestExecutionRecording:
         collector = MetricsCollector()
         collector._execution_count = 1
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_success_total.inc') as mock_success_inc, \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec') as mock_active_dec, \
-             patch('src.mdapflow_mcp.metrics.mdap_voting_rounds_histogram.observe') as mock_rounds_obs, \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs, \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
+        with patch('src.ensample.metrics.mdap_execution_success_total.inc') as mock_success_inc, \
+             patch('src.ensample.metrics.mdap_active_executions.dec') as mock_active_dec, \
+             patch('src.ensample.metrics.mdap_voting_rounds_histogram.observe') as mock_rounds_obs, \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs, \
+             patch('src.ensample.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
+             patch('src.ensample.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
             
             # Set up the histogram mock chain
             mock_cost_hist.return_value.observe = MagicMock()
@@ -105,21 +105,21 @@ class TestExecutionRecording:
         """Test recording successful execution with token data."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_success_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec'), \
-             patch('src.mdapflow_mcp.metrics.mdap_voting_rounds_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_per_execution_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_cost_usd_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_llm_calls_total.labels') as mock_calls, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
-             patch('src.mdapflow_mcp.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
-             patch('src.mdapflow_mcp.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_total_execution_counter.labels') as mock_total_counter:
+        with patch('src.ensample.metrics.mdap_execution_success_total.inc'), \
+             patch('src.ensample.metrics.mdap_active_executions.dec'), \
+             patch('src.ensample.metrics.mdap_voting_rounds_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_tokens_per_execution_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
+             patch('src.ensample.metrics.mdap_estimated_cost_usd_total.inc'), \
+             patch('src.ensample.metrics.mdap_llm_calls_total.labels') as mock_calls, \
+             patch('src.ensample.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
+             patch('src.ensample.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
+             patch('src.ensample.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
+             patch('src.ensample.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
+             patch('src.ensample.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated, \
+             patch('src.ensample.metrics.mdap_tokens_total_execution_counter.labels') as mock_total_counter:
             
             # Set up the mock chains
             mock_cost_hist.return_value.observe = MagicMock()
@@ -155,12 +155,12 @@ class TestExecutionRecording:
         """Test recording successful execution with zero cost."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_success_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec'), \
-             patch('src.mdapflow_mcp.metrics.mdap_voting_rounds_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
+        with patch('src.ensample.metrics.mdap_execution_success_total.inc'), \
+             patch('src.ensample.metrics.mdap_active_executions.dec'), \
+             patch('src.ensample.metrics.mdap_voting_rounds_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
+             patch('src.ensample.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
             
             # Set up the histogram mock chain
             mock_cost_hist.return_value.observe = MagicMock()
@@ -183,9 +183,9 @@ class TestExecutionRecording:
         """Test recording failed execution."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_failed_total.inc') as mock_failed_inc, \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec') as mock_active_dec, \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs:
+        with patch('src.ensample.metrics.mdap_execution_failed_total.inc') as mock_failed_inc, \
+             patch('src.ensample.metrics.mdap_active_executions.dec') as mock_active_dec, \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs:
             
             collector.record_execution_failure(latency_ms=5000)
             
@@ -202,7 +202,7 @@ class TestRedFlagRecording:
         """Test recording red flag hit."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_red_flags_hit_total.labels') as mock_labels:
+        with patch('src.ensample.metrics.mdap_red_flags_hit_total.labels') as mock_labels:
             mock_labels.return_value.inc = MagicMock()
             
             collector.record_red_flag_hit("keyword")
@@ -218,9 +218,9 @@ class TestTokenRecording:
         """Test recording token usage with only prompt tokens."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
-             patch('src.mdapflow_mcp.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
+        with patch('src.ensample.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
+             patch('src.ensample.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
             
             # Set up mock chains
             mock_prompt.return_value.inc = MagicMock()
@@ -243,9 +243,9 @@ class TestTokenRecording:
         """Test recording token usage with only completion tokens."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
-             patch('src.mdapflow_mcp.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
+        with patch('src.ensample.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
+             patch('src.ensample.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
             
             # Set up mock chains
             mock_completion.return_value.inc = MagicMock()
@@ -268,11 +268,11 @@ class TestTokenRecording:
         """Test recording token usage with both prompt and completion tokens."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
-             patch('src.mdapflow_mcp.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
-             patch('src.mdapflow_mcp.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
+        with patch('src.ensample.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
+             patch('src.ensample.metrics.mdap_prompt_tokens_histogram.labels') as mock_prompt_hist, \
+             patch('src.ensample.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
+             patch('src.ensample.metrics.mdap_completion_tokens_histogram.labels') as mock_completion_hist, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
             
             # Set up mock chains
             mock_prompt.return_value.inc = MagicMock()
@@ -300,9 +300,9 @@ class TestTokenRecording:
         """Test recording token usage with zero tokens."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
+        with patch('src.ensample.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
+             patch('src.ensample.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated:
             
             collector.record_llm_call_tokens(
                 provider="test",
@@ -325,8 +325,8 @@ class TestCostRecording:
         """Test recording cost with token data."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
+        with patch('src.ensample.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
+             patch('src.ensample.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
             
             # Set up mock chains
             mock_provider_cost.return_value.inc = MagicMock()
@@ -351,8 +351,8 @@ class TestCostRecording:
         """Test recording cost with zero cost."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
+        with patch('src.ensample.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
+             patch('src.ensample.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
             
             collector.record_llm_call_cost(
                 provider="test",
@@ -370,8 +370,8 @@ class TestCostRecording:
         """Test recording cost without token data."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
+        with patch('src.ensample.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
+             patch('src.ensample.metrics.mdap_cost_per_token_gauge.labels') as mock_cost_per_token:
             
             collector.record_llm_call_cost(
                 provider="test",
@@ -391,7 +391,7 @@ class TestProviderHealth:
         """Test updating provider health to healthy."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_provider_health.labels') as mock_labels:
+        with patch('src.ensample.metrics.mdap_provider_health.labels') as mock_labels:
             mock_labels.return_value.set = MagicMock()
             
             collector.update_provider_health("openai", True)
@@ -403,7 +403,7 @@ class TestProviderHealth:
         """Test updating provider health to unhealthy."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_provider_health.labels') as mock_labels:
+        with patch('src.ensample.metrics.mdap_provider_health.labels') as mock_labels:
             mock_labels.return_value.set = MagicMock()
             
             collector.update_provider_health("anthropic", False)
@@ -419,8 +419,8 @@ class TestMetricsExport:
         """Test getting metrics in Prometheus text format."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.generate_latest') as mock_generate, \
-             patch('src.mdapflow_mcp.metrics.CONTENT_TYPE_LATEST', "text/plain; version=1.0.0; charset=utf-8"):
+        with patch('src.ensample.metrics.generate_latest') as mock_generate, \
+             patch('src.ensample.metrics.CONTENT_TYPE_LATEST', "text/plain; version=1.0.0; charset=utf-8"):
             
             mock_generate.return_value = b"metric1\nmetric2\n"
             
@@ -483,11 +483,11 @@ class TestEdgeCases:
         """Test handling negative cost gracefully."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_success_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec'), \
-             patch('src.mdapflow_mcp.metrics.mdap_voting_rounds_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
+        with patch('src.ensample.metrics.mdap_execution_success_total.inc'), \
+             patch('src.ensample.metrics.mdap_active_executions.dec'), \
+             patch('src.ensample.metrics.mdap_voting_rounds_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_estimated_cost_usd_total.inc') as mock_cost_inc:
             
             # Should handle negative cost (though unlikely in practice)
             collector.record_execution_success(
@@ -505,19 +505,19 @@ class TestEdgeCases:
         """Test handling large numbers in metrics."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_success_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec'), \
-             patch('src.mdapflow_mcp.metrics.mdap_voting_rounds_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_per_execution_histogram.observe'), \
-             patch('src.mdapflow_mcp.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_cost_usd_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_llm_calls_total.labels') as mock_calls, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
-             patch('src.mdapflow_mcp.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
-             patch('src.mdapflow_mcp.metrics.mdap_estimated_token_percentage.labels') as mock_estimated, \
-             patch('src.mdapflow_mcp.metrics.mdap_tokens_total_execution_counter.labels') as mock_total_counter:
+        with patch('src.ensample.metrics.mdap_execution_success_total.inc'), \
+             patch('src.ensample.metrics.mdap_active_executions.dec'), \
+             patch('src.ensample.metrics.mdap_voting_rounds_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_tokens_per_execution_histogram.observe'), \
+             patch('src.ensample.metrics.mdap_cost_per_execution_histogram.labels') as mock_cost_hist, \
+             patch('src.ensample.metrics.mdap_estimated_cost_usd_total.inc'), \
+             patch('src.ensample.metrics.mdap_llm_calls_total.labels') as mock_calls, \
+             patch('src.ensample.metrics.mdap_tokens_prompt_total.labels') as mock_prompt, \
+             patch('src.ensample.metrics.mdap_tokens_completion_total.labels') as mock_completion, \
+             patch('src.ensample.metrics.mdap_provider_cost_usd_total.labels') as mock_provider_cost, \
+             patch('src.ensample.metrics.mdap_estimated_token_percentage.labels') as mock_estimated, \
+             patch('src.ensample.metrics.mdap_tokens_total_execution_counter.labels') as mock_total_counter:
             
             # Set up all the mock chains properly
             mock_cost_hist.return_value.observe = MagicMock()
@@ -549,9 +549,9 @@ class TestEdgeCases:
         """Test recording failure with large latency."""
         collector = MetricsCollector()
         
-        with patch('src.mdapflow_mcp.metrics.mdap_execution_failed_total.inc'), \
-             patch('src.mdapflow_mcp.metrics.mdap_active_executions.dec'), \
-             patch('src.mdapflow_mcp.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs:
+        with patch('src.ensample.metrics.mdap_execution_failed_total.inc'), \
+             patch('src.ensample.metrics.mdap_active_executions.dec'), \
+             patch('src.ensample.metrics.mdap_execution_latency_ms_histogram.observe') as mock_latency_obs:
             
             collector.record_execution_failure(latency_ms=3600000)  # 1 hour
             
@@ -568,7 +568,7 @@ class TestGlobalMetricsCollector:
 
     def test_global_metrics_collector_is_singleton(self):
         """Test that global metrics collector is the same instance."""
-        from src.mdapflow_mcp.metrics import metrics_collector as another_ref
+        from src.ensample.metrics import metrics_collector as another_ref
         
         assert metrics_collector is another_ref
 

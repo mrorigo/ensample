@@ -4,9 +4,9 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.mdapflow_mcp.ensemble_manager import EnsembleManager
-from src.mdapflow_mcp.llm_provider import LLMProviderInterface
-from src.mdapflow_mcp.models import EnsembleConfig, LLMConfig, LLMResponse
+from src.ensample.ensemble_manager import EnsembleManager
+from src.ensample.llm_provider import LLMProviderInterface
+from src.ensample.models import EnsembleConfig, LLMConfig, LLMResponse
 
 
 class TestEnsembleManagerInitialization:
@@ -358,24 +358,19 @@ class TestDispatchEnsembleCalls:
         provider_interface = MagicMock(spec=LLMProviderInterface)
         manager = EnsembleManager(provider_interface)
         
-        # Mock some failing and some succeeding calls
-        async def mock_generate_with_failures(prompt):
-            if hasattr(mock_generate_with_failures, 'call_count'):
-                mock_generate_with_failures.call_count += 1
-            else:
-                mock_generate_with_failures.call_count = 1
-            
-            if mock_generate_with_failures.call_count % 2 == 0:
-                raise Exception("API Error")
-            else:
-                return LLMResponse(
-                    response="successful response",
-                    llm_config=LLMConfig(provider="openai", model="gpt-4o"),
-                    cost_estimate=0.05
-                )
+        # Mock some failing and some succeeding calls using side_effect list
+        error_response = Exception("API Error")
+        success_response = LLMResponse(
+            response="successful response",
+            llm_config=LLMConfig(provider="openai", model="gpt-4o"),
+            cost_estimate=0.05
+        )
+        
+        # Alternate between success and failure
+        side_effect = [success_response, error_response, success_response, error_response]
         
         mock_client = AsyncMock()
-        mock_client.generate.side_effect = mock_generate_with_failures
+        mock_client.generate.side_effect = side_effect
         provider_interface.get_client.return_value = mock_client
         
         config = EnsembleConfig(
@@ -388,10 +383,10 @@ class TestDispatchEnsembleCalls:
         responses = await manager.dispatch_ensemble_calls(
             prompt="test prompt",
             ensemble_config=config,
-            num_calls_per_model=2  # 4 total calls, 2 should fail
+            num_calls_per_model=2  # 4 total calls, 2 should succeed
         )
         
-        # Should have 2 successful responses (every other call)
+        # Should have 2 successful responses
         assert len(responses) == 2
         assert all(isinstance(resp, LLMResponse) for resp in responses)
         

@@ -4,8 +4,8 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mdapflow_mcp.llm_provider import LiteLLMClient, LLMProviderInterface
-from mdapflow_mcp.models import LLMConfig, TokenUsage, LLMResponse
+from ensample.llm_provider import LiteLLMClient, LLMProviderInterface
+from ensample.models import LLMConfig, TokenUsage, LLMResponse
 
 
 class TestLiteLLMClient:
@@ -375,8 +375,8 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_full_cost_calculation_workflow(self):
         """Test the complete cost calculation workflow."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig, TokenUsage
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig, TokenUsage
         
         config = LLMConfig(
             provider="openai",
@@ -405,7 +405,7 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_multiple_provider_cost_comparison(self):
         """Test cost comparison across different providers."""
-        from mdapflow_mcp.llm_provider import LLMProviderInterface
+        from ensample.llm_provider import LLMProviderInterface
         
         # Create interface with multiple providers
         provider = LLMProviderInterface()

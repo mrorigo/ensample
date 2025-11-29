@@ -3,17 +3,17 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from src.mdapflow_mcp.voting_mechanism import VotingMechanism
-from src.mdapflow_mcp.models import (
+from src.ensample.voting_mechanism import VotingMechanism
+from src.ensample.models import (
     EnsembleConfig,
     LLMConfig,
     LLMResponse,
     MDAPInput,
     ParsedResponse,
 )
-from src.mdapflow_mcp.ensemble_manager import EnsembleManager
-from src.mdapflow_mcp.red_flagging_engine import RedFlaggingEngine
-from src.mdapflow_mcp.output_parser import OutputParser
+from src.ensample.ensemble_manager import EnsembleManager
+from src.ensample.red_flagging_engine import RedFlaggingEngine
+from src.ensample.output_parser import OutputParser
 
 
 class TestVotingMechanismInitialization:

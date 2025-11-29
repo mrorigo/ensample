@@ -1,7 +1,7 @@
 """Comprehensive tests for FastPathController - performance optimization component."""
 
-from src.mdapflow_mcp.fast_path_controller import FastPathController
-from src.mdapflow_mcp.models import (
+from src.ensample.fast_path_controller import FastPathController
+from src.ensample.models import (
     MDAPInput,
     LLMConfig,
     ParsedResponse,

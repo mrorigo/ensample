@@ -1,4 +1,4 @@
-"""FastMCP server bootstrap for MDAPFlow-MCP."""
+"""FastMCP server bootstrap for Ensample."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ configure_tracing()
 @asynccontextmanager
 async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
     """Lifespan manager for server startup and shutdown."""
-    LOGGER.info("Starting MDAPFlow-MCP server", extra={"version": "0.1.0"})
+    LOGGER.info("Starting Ensample server", extra={"version": "0.1.0"})
 
     # Initialize settings
     settings = Settings()
@@ -43,7 +43,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
     server.mdap_engine = mdap_engine  # type: ignore[attr-defined]
     server.settings = settings  # type: ignore[attr-defined]
 
-    LOGGER.info("MDAPFlow-MCP server initialized", extra={
+    LOGGER.info("Ensample server initialized", extra={
         "max_concurrent_calls": settings.MDAP_MAX_CONCURRENT_LLM_CALLS,
         "max_voting_rounds": settings.MDAP_MAX_VOTING_ROUNDS,
     })
@@ -56,14 +56,14 @@ async def lifespan(server: FastMCP) -> AsyncIterator[dict]:
             "maintenance_tools": maintenance_tools,
         }
     finally:
-        LOGGER.info("MDAPFlow-MCP server shutdown")
+        LOGGER.info("Ensample server shutdown")
 
 
-server = FastMCP("MDAPFlowMCP", lifespan=lifespan)
+server = FastMCP("Ensample", lifespan=lifespan)
 
 
 def main() -> None:
-    """Entry point used by `uv run mdapflow-mcp`."""
+    """Entry point used by `uv run ensample`."""
     transport = os.environ.get("MDAP_SERVER_TRANSPORT", "stdio").lower()
     try:
         if transport == "stdio":

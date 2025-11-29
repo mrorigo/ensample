@@ -21,7 +21,7 @@ class MDAPTools:
     def register(self, server: FastMCP) -> None:
         """Register MDAP tools with the FastMCP server."""
 
-        @instrumented_tool(server, name="mdapflow.execute_llm_role")
+        @instrumented_tool(server, name="ensample.execute_llm_role")
         async def execute_llm_role(
             prompt: str = Field(..., description="The natural language prompt for the LLM role or function."),
             role_name: str = Field(..., description="A descriptive identifier for the LLM role or function being performed by the client (e.g., 'DocumentSummarizer', 'CodeGenerator', 'IntentClassifier'). Used for logging and metrics."),

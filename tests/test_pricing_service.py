@@ -5,8 +5,8 @@ import pytest_asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mdapflow_mcp.pricing_service import PricingService, PricingInfo, get_pricing_service
-from mdapflow_mcp.models import TokenUsage
+from ensample.pricing_service import PricingService, PricingInfo, get_pricing_service
+from ensample.models import TokenUsage
 
 
 @pytest_asyncio.fixture
@@ -191,8 +191,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_token_usage_cost_calculation_gpt4o_mini(self):
         """Test cost calculation with TokenUsage objects for GPT-4o-mini."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="openai",
@@ -220,8 +220,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_token_usage_cost_calculation_claude_opus(self):
         """Test cost calculation with TokenUsage objects for Claude Opus."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="anthropic",
@@ -249,8 +249,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_token_usage_cost_calculation_gemini(self):
         """Test cost calculation with TokenUsage objects for Gemini."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="google",
@@ -277,8 +277,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_none_token_usage_handling(self):
         """Test handling of None token usage."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="openai",
@@ -294,8 +294,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_estimated_vs_actual_pricing(self):
         """Test pricing for estimated vs actual token usage."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="deepseek",
@@ -332,8 +332,8 @@ class TestPricingIntegration:
     @pytest.mark.asyncio
     async def test_mistral_cost_calculation(self):
         """Test cost calculation for Mistral models."""
-        from mdapflow_mcp.llm_provider import LiteLLMClient
-        from mdapflow_mcp.models import LLMConfig
+        from ensample.llm_provider import LiteLLMClient
+        from ensample.models import LLMConfig
         
         config = LLMConfig(
             provider="mistralai",

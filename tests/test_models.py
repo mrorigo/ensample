@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.mdapflow_mcp.models import LLMConfig, EnsembleConfig, RedFlagConfig, MDAPInput
+from src.ensample.models import LLMConfig, EnsembleConfig, RedFlagConfig, MDAPInput
 
 
 def test_llm_config_creation():
@@ -28,7 +28,7 @@ def test_ensemble_config_creation():
 
 def test_red_flag_config_creation():
     """Test RedFlagConfig creation."""
-    from src.mdapflow_mcp.models import RedFlagRule
+    from src.ensample.models import RedFlagRule
 
     rules = [
         RedFlagRule(

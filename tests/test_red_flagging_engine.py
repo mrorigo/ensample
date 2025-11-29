@@ -5,8 +5,8 @@ import json
 import jsonschema
 from unittest.mock import MagicMock
 
-from src.mdapflow_mcp.red_flagging_engine import RedFlaggingEngine
-from src.mdapflow_mcp.models import RedFlagConfig, RedFlagRule
+from src.ensample.red_flagging_engine import RedFlaggingEngine
+from src.ensample.models import RedFlagConfig, RedFlagRule
 
 
 class TestRedFlaggingEngineInitialization:
