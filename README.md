@@ -290,6 +290,23 @@ Detailed server information:
 - **`length_exceeds`**: Filter responses below token threshold
 - **`json_parse_error`**: Filter responses failing JSON validation against schema
 
+### Fast-Path Optimization
+
+Enable `fast_path_enabled` to optimize for latency and cost in high-confidence scenarios.
+
+**When to use it:**
+- **Low-Risk Queries**: Tasks where a single correct answer is likely and verification is easy.
+- **Latency-Sensitive Apps**: When user experience demands sub-second responses.
+- **Cost control**: To avoid full ensemble execution for simple prompts.
+
+**How it works:**
+1. **Initial Check**: Starts with a smaller initial ensemble (max 2 models).
+2. **Immediate Validation**: Checks if conditions are met after the first round.
+   - **Greedy (`k=0`)**: Returns the first valid response immediately.
+   - **Majority (`k=1`)**: Returns immediately if a response has >50% vote share.
+   - **Consensus (`k>1`)**: Returns if a "Strong Consensus" (80% agreement with 3+ votes) or "K-Advantage" is met early.
+3. **Fallback**: If fast-path criteria aren't met, seamlessly transitions to full MDAP voting.
+
 ## 📊 Observability
 
 ### Metrics (Prometheus)
