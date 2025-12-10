@@ -14,6 +14,7 @@ from .config import (
 from .ensemble_manager import EnsembleManager
 from .fast_path_controller import FastPathController
 from .llm_provider import LLMProviderInterface
+from .metrics import metrics_collector
 from .models import (
     EnsembleConfig,
     LLMResponse,
@@ -81,6 +82,7 @@ class MDAPEngine:
             MDAPOutput with final response and metrics
         """
         start_time = time.perf_counter()
+        metrics_collector.record_execution_start()
 
         # Prepare tracing context
         with TRACER.start_as_current_span("mdap_execute_llm_role") as span:
@@ -148,6 +150,15 @@ class MDAPEngine:
                     error_message=None,
                 )
 
+                metrics_collector.record_execution_success(
+                    latency_ms=int((time.perf_counter() - start_time) * 1000),
+                    voting_rounds=metrics.voting_rounds,
+                    llm_calls=metrics.total_llm_calls,
+                    cost_usd=metrics.estimated_llm_cost_usd,
+                    total_tokens=0,
+                    role_name=mdap_input.role_name,
+                )
+
                 LOGGER.info("MDAP execution completed successfully", extra=_with_trace({
                     "role_name": mdap_input.role_name,
                     "confidence_score": confidence_score,
@@ -167,6 +178,10 @@ class MDAPEngine:
                 # Update span with error
                 span.record_exception(e)
                 span.set_status("ERROR", error_msg)
+
+                metrics_collector.record_execution_failure(
+                    latency_ms=int((time.perf_counter() - start_time) * 1000)
+                )
 
                 # Return error response
                 time_taken_ms = int((time.perf_counter() - start_time) * 1000)
