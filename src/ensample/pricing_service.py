@@ -127,18 +127,6 @@ class PricingService:
             except Exception as e:
                 LOGGER.debug("OpenRouter pricing fetch failed", extra={"error": str(e)})
 
-        # Try provider-specific APIs
-        try:
-            if provider.lower() == "openai":
-                return await self._fetch_openai_pricing(model)
-            elif provider.lower() == "anthropic":
-                return await self._fetch_anthropic_pricing(model)
-        except Exception as e:
-            LOGGER.debug("Provider-specific pricing fetch failed", extra={
-                "provider": provider,
-                "error": str(e)
-            })
-
         return None
 
     async def _fetch_openrouter_pricing(self, provider: str, model: str) -> PricingInfo | None:
@@ -167,22 +155,6 @@ class PricingService:
         except Exception as e:
             LOGGER.warning("Failed to fetch OpenRouter pricing", extra={"error": str(e)})
             return None
-
-    async def _fetch_openai_pricing(self, model: str) -> PricingInfo | None:
-        """Fetch OpenAI pricing from their pricing page (scraped)."""
-        # Note: This is a simplified implementation
-        # In production, you might use OpenAI's official pricing API if available
-        # or a third-party service that maintains up-to-date pricing
-        
-        # For now, return None to use fallback
-        # This could be enhanced with actual API integration
-        return None
-
-    async def _fetch_anthropic_pricing(self, model: str) -> PricingInfo | None:
-        """Fetch Anthropic pricing."""
-        # Similar to OpenAI, this would require actual API integration
-        # For now, return None to use fallback
-        return None
 
     async def clear_cache(self) -> None:
         """Clear the pricing cache."""
